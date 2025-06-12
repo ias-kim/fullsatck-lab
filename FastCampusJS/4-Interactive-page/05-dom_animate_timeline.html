@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+  <style>
+    .box {
+      position: fixed; /* 항상 화면에 고정 */
+      left: 0;
+      top: 0;
+      width: 100vw;    /* 초기에는 꽉 찬 폭이지만.. */
+      height: 100vh;
+      background-color: tomato;
+    }
+    body {
+      height: 300vh;   /* 스크롤 가능하게 만듦*/
+    }
+  </style>
+</head>
+<body>
+    <!-- 스크롤에 따라 width가 변화하는 대상 박스 -->
+    <div class="box"></div>
+    <script>
+      const box = document.querySelector(".box");
+
+      // Web Animations API + ScrollTimeline 사용
+      box.animate({
+        width: ["0px", "100%"], // 스크롤 시작 시 0 -> 끝에 100%
+      }, {
+        duration: 1000,         // 지속 시간은 의미 없음 (timeline이 제어)
+        easing: "ease-out",     // 부드럽게 출력
+        timeline: new ScrollTimeline({
+          scrollOffsets: [
+            {target: box, edge: "start", threshold: "0"}, // 시작
+            {target: box, edge: "end", threshold: "1"} // 끝
+          ]
+        })
+      });
+    </script>
+</body>
+</html>
