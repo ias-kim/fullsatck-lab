@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <!-- SVG 애니메이션: 대각성 이동 + 색상 변화 -->
+    <svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+
+        <!-- 빨간 원에서 시작 -->
+      <circle cx="100" cy="100" r="40" fill="red">
+
+          <!-- X 축 방향 이동 (100 -> 300) -->
+        <animate
+                attributeName="cx"
+                from="100"
+                to="300"
+                dur="5s"
+                repeatCount="indefinite"
+        />
+
+          <!-- Y 축 방향 이동 (100 -> 300) -->
+        <animate
+                attributeName="cy"
+                from="100"
+                to="300"
+                dur="5s"
+                repeatCount="indefinite"
+        />
+
+          <!-- 색상 변화: 빨 파 추 초 빨 -->
+        <animate
+                attributeName="fill"
+                dur="5s"
+                values="red;blue;orange;green;red"
+                repeatCount="indefinite"
+        />
+      </circle>
+    </svg>
+</body>
+</html>
