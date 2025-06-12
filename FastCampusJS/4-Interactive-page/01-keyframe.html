@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        /* 원형 애니메이션 요소 스타일 정의 */
+      .animated-circle {
+        width: 100px;       /* 가로 크기 */
+        height: 100px;      /* 세로 크기 */
+        border-radius: 50%; /* 원형 만들기 */
+        background-color: blue; /* 초기 배경색 */
+        position: absolute;     /* 위치를 자유롭게 이동 가능하게 설정 */
+        animation: moveAndChange 5s infinite;   /* 아래 정의된 키프레임을 5초 주기로 무한 반복 */
+      }
+
+      /* 원형의 이동 + 색상 변화 + 확대/축소ㅓ 애니메이션 정의*/
+      @keyframes moveAndChange {
+        0% {
+          top: 10%;     /* 좌측 상단 시작*/
+          left: 10%;
+          background-color: blue; /* 초기 색상 */
+          transform: scale(1);    /* 원래 크기 */
+      }
+        25% {
+          top: 10%;
+          left: 80%;                /* 우측 상단으로 이동*/
+          background-color: yellow; /* 색상 변경 */
+          transform: scale(1.5);    /* 확대 크기 */
+        }
+        50% {
+          top: 80%;
+          left: 80%;                /* 우측 하단으로 이동 */
+          background-color: green;
+          transform: scale(1);
+        }
+        75% {
+          top: 80%;
+          left: 10%;                /* 좌측 하단으로 이동 */
+          background-color: orange;
+          transform: scale(1.5);
+        }
+        100% {
+          top: 10%;
+          left: 10%;                /* 초기 위치로 */
+          background-color: blue;
+          transform: scale(1);
+        }
+      }
+    </style>
+</head>
+<body>
+    <div class="animated-circle"></div>
+</body>
+</html>
