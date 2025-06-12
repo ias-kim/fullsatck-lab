@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <!-- 애니메이션 대상 사각형 div  -->
+    <div id="animate" style="width: 100px; height: 100px; background-color: chartreuse">
+    </div>
+    <script>
+        // 대상 요소 가져오기
+      const box = document.getElementById("animate");
+
+        // Web Animation API를 이용해 애니메이션 실행
+      box.animate([
+               // Keyframes: 움직임 정의
+              { transform: "translateX(0px)"}, // 시작 위치
+              { transform: "translateX(1000px)"}, // 종료 위치
+              ], {
+              duration: 2000, // 시간 2초
+              iterations: Infinity, // 무한 반복
+              direction: "alternate" // 왕복 애니메이션
+              }
+      );
+    </script>
+</body>
+</html>
