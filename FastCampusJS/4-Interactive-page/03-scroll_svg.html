@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+      body {
+        height: 200vh;      /* 스크롤 가능하게 문서 높이 2배 */
+        margin: 0;
+      }
+      svg {
+        position: fixed;    /* 스크롤해도 고정된 위치에 계속 표시 */
+        top: 0;
+        left: calc(50% - 200px); /* 가운데 정렬 (SVG 너비의 반을 빼서 중앙에 배치) */
+      }
+    </style>
+</head>
+<body>
+    <!-- 원형 SVG 요소, 초기 반지름 200px -->
+    <svg width="400px" height="400px" style="border: 1px solid black">
+      <circle id="scrollCircle" cx="200" cy="200" r="200" fill="orange" />
+    </svg>
+    <script>
+        // DOM이 로드된 후 실행
+      document.addEventListener("DOMContentLoaded", function() {
+        const circle = document.getElementById("scrollCircle");
+          // 스크롤 이벤트 리스너 등록
+        window.addEventListener("scroll", () => {
+          const docHeight = document.documentElement.scrollHeight; // 전체 문서 높이
+          const viewportHeight = window.innerHeight;               // 현재 화면 높이
+          const scrollAmount = document.documentElement.scrollTop; // 현재 스크롤 양
+          const maxScroll = docHeight - viewportHeight;            // 최대 스크롤 가능 범위
+
+            // 스크롤 비율에 따라 원의 반지름을 줄임 (200 -> 최소 10)
+          const newRadius = 200 - (scrollAmount / maxScroll) * (200 - 10);
+
+          // 반지름이 최소 10보다 작아지지 않도록 제한
+          circle.setAttribute("r", Math.max(10, newRadius));
+        })
+      })
+    </script>
+</body>
+</html>
