@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+  const SpeechRecognition =
+          window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  const recognition = new SpeechRecognition();
+  console.log(recognition);
+  recognition.continous = true;
+  recognition.lang = 'ko-KR';
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    console.log("started");
+  }
+
+  recognition.onresult = (event) => {
+    const text = event.results[event.results.length - 1][0].transcript;
+    console.log(text);
+    speak(text);
+  };
+
+  recognition.onend = () => {
+    recognition.start();
+  }
+
+
+  document.getElementById("speech").onclick = () => {
+    recognition.start();
+  };
+
+  function speak(text) {
+    const utterance = new SpeechSynthesisUtterance('말하기 버튼을 눌렀습니다');
+    speechSynthesis.speak(utterance);
+    speechSynthesis.onend = () => {
+      recognition.start();
+    };
+  }
+</script>
+</body>
+</html>
