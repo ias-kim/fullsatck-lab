@@ -1,10 +1,12 @@
-
 import { NormalDraw, SelectDraw } from "./draw.js";
-import { createImageItem, createVideoItem, isDrawbleItem } from './util.js';
-import { getVisualizer } from './visualizer.js';
-class Drawable {
+import { createImageItem, createVideoItem, isDrawableItem } from "./util.js";
+import { getVisualizer } from "./visualizer.js";
+import { Observer } from "./observer.js";
+
+class Drawable extends Observer {
     #drawStrategy;
     constructor() {
+        super();
         this.#drawStrategy = new NormalDraw();
     }
     draw(ctx) {
@@ -13,10 +15,14 @@ class Drawable {
     setDrawStrategy(drawStrategy) {
         this.#drawStrategy = drawStrategy;
     }
+    update(data) {
+        throw new Error("구현해!");
+    }
 }
+
 class Item extends Drawable {
     #position;
-    #animateHandel;
+    #animateHandle;
     scale;
     visualizer;
     constructor(index, gallery) {
@@ -37,55 +43,59 @@ class Item extends Drawable {
 
         this.#position = {
             left: col * (itemWidth + margin),
-            top: col * (itemHeight + margin),
+            top: row * (itemHeight + margin),
             width: itemWidth,
             height: itemHeight,
         };
     }
-
     #animateScale(targetScale, duration = 250) {
-            // 애니메이션 시작 시간을 기록합니다.
-            const start = Date.now();
-            // 애니메이션 시작 시점의 초기 배율을 1로 설정합니다. (항상 1에서 시작해서 targetScale로 변경)
-            const initialScale = 1;
-            // 초기 배율과 목표 배율 간의 차이를 계산합니다.
-            const diff = targetScale - initialScale;
+        const start = Date.now();
+        const initialScale = 1;
+        const diff = targetScale - initialScale;
+        const step = () => {
+            const timePassed = Date.now() - start;
+            const progress = timePassed / duration;
+            this.scale = initialScale + diff * progress;
 
-            // 애니메이션의 각 프레임을 처리하는 내부 함수입니다.
-            const step = () => {
-                // 애니메이션 시작 후 현재까지 경과된 시간을 계산합니다.
-                const timePassed = Date.now() - start;
-                // 전체 애니메이션 시간 대비 현재 경과 시간의 비율을 계산합니다. (0.0 ~ 1.0)
-                const progress = timePassed / duration;
-                // 현재 프레임에서의 확대 배율을 계산합니다. (초기 배율 + (변화량 * 진행률))
-                // 애니메이션 진행률이 1 미만이면 (애니메이션이 아직 끝나지 않았으면)
-                if (progress < 1) {
-                    // 다음 애니메이션 프레임을 요청합니다. (재귀 호출)
-                    this.#animateHandel = requestAnimationFrame(step);
-                }
-            };
-            // 애니메이션의 첫 번째 프레임을 시작합니다.
-            step();
+            if (progress < 1) {
+                this.#animateHandle = requestAnimationFrame(step);
+            }
+        };
+        step();
     }
     select() {
         this.setDrawStrategy(new SelectDraw());
     }
     unselect() {
-        this.setDrawStrategy(new Select)
+        this.setDrawStrategy(new NormalDraw());
     }
     hover() {
         this.#animateScale(1.2);
     }
     leave() {
-        cancelAnimationFrame(this.#animateHandel);
+        cancelAnimationFrame(this.#animateHandle);
         this.scale = 1;
     }
     hitTest(x, y) {
-        const {left, top, width, height} = this.#position;
+        const { left, top, width, height } = this.#position;
         return x > left && x < left + width && y > top && y < top + height;
     }
     draw(ctx) {
         this.source && super.draw(ctx);
+    }
+    update(data) {
+        switch (data.type) {
+            case "select":
+            {
+                data.index === this.index ? this.select() : this.unselect();
+            }
+                break;
+            case "hover":
+            {
+                data.index === this.index ? this.hover() : this.leave();
+            }
+                break;
+        }
     }
 }
 
@@ -109,10 +119,9 @@ export class VideoItem extends Item {
     }
     #initVisualizer() {
         this.visualizer === null &&
-        !IsDrawbleItem(this.source) &&
-        (this.visualizer = getVisualizer(this.source, 640, 30));
+        !isDrawableItem(this.source) &&
+        (this.visualizer = getVisualizer(this.source, 640, 320));
     }
-
     select() {
         this.#initVisualizer();
         this.visualizer?.play();
@@ -133,9 +142,10 @@ export class ItemFactory {
         return this.createItem(index, src, gallery);
     }
     createItem(index, src, gallery) {
-        throw new Error('구현');
+        throw new Error("구현해");
     }
 }
+
 export class ImageItemFactory extends ItemFactory {
     createItem(index, src, gallery) {
         return new ImageItem(index, src, gallery);
