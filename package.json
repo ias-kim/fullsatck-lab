@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "parcel": "^2.15.2",
     "prettier": "^3.3.1",
     "typescript": "^5.8.3",
     "vite": "^5.1.6"

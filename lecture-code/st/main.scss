@@ -1,0 +1,52 @@
+.card-box {
+  max-width: 800px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  border: 1px solid lightgray;
+  margin: 0 auto;
+
+  .card-container {
+    width: 100px;
+    height: 150px;
+
+
+    .card {
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border: 1px red dashed;
+      transition: transform 0.8s;
+      position: relative;
+      z-index: 0;
+    }
+
+    .card:hover {
+      transform: scale(1.5) rotate(360deg);
+      z-index: 10;
+    }
+  }
+}
+
+$path: './../Cards/';
+$card: 'cardSpades';
+@for $i from 1 through 13 {
+  $label: $i;
+  @if $i == 1 {
+    $label: 'A';
+  } @else if $i == 11 {
+    $label: 'J';
+  } @else if $i == 12 {
+    $label: 'Q';
+  } @else if $i == 13 {
+    $label: 'K';
+  }
+  .card-box .card-container:nth-child(#{$i}) .card {
+    background-image: url('#{$path}#{$card}#{$label}.png');
+  }
+
+}
