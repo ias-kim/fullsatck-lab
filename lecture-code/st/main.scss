@@ -1,5 +1,91 @@
+$header-height: 50px;
+
+header {
+  position: fixed;
+  background-color: black;
+  height: $header-height;
+  width: 100%;
+  z-index: 1000;
+
+  nav {
+    height: 100%;
+
+
+    ul {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      height: 100%;
+      list-style: none;
+      gap: 5px;
+
+      li {
+        height: 100%;
+        color: white;
+        border: 1px white solid;
+        transition: all 0.2s;
+
+        a {
+          text-decoration: none;
+        }
+
+        &:hover { // 가상 선택자 요소 선택
+          background-color: white;
+        }
+      }
+    }
+  }
+
+}
+
+.menu {
+  .link {
+    text-decoration: none;
+  }
+
+  .odd {
+    color: white;;
+  }
+
+  .even {
+    color: red;
+  }
+
+
+}
+
+footer {
+  background-color: blue;
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  height: 60px;
+  width: 100%;
+  z-index: 1000;
+  //
+  display: flex;
+  justify-content: center;
+  align-content: center;
+
+  .logo {
+    flex: 1 1 0; // 비율을 지정할 때에 자주 사용
+    border: black 0.5px dashed;
+    height: 100%;
+    width: 100%;
+
+  }
+
+  .contact-info {
+    flex: 3 1 0;
+
+    border: black 0.5px dashed;
+  }
+}
+
 .card-box {
   max-width: 800px;
+  padding: $header-height;
   display: flex;
   justify-content: center;
   align-items: center;
