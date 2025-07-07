@@ -17,6 +17,7 @@ Thumbs.db
 # Local env files
 .env
 .env.*          # for .env.development, .env.production
+.env.local
 
 # npm/yarn lock & debug
 npm-debug.log*

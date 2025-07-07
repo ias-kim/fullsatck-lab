@@ -1,22 +1,22 @@
-// function fetchData() {
-//   return new Promise((resolve, reject) => {
-//     // 비동기 요청
-//     const success = false;
-//     if (success) {
-//       resolve('성공');
-//     } else {
-//       reject('실패');
-//     }
-//   });
-// }
-//
-// fetchData()
-//   .then((response) => {
-//     console.log(response);
-//   })
-//   .catch((error) => {
-//     console.log(error);
-//   });
+function fetchData() {
+  return new Promise((resolve, reject) => {
+    // 비동기 요청
+    const success = false;
+    if (success) {
+      resolve('성공');
+    } else {
+      reject('실패');
+    }
+  });
+}
+
+fetchData()
+  .then((response) => {
+    console.log(response);
+  })
+  .catch((error) => {
+    console.log(error);
+  });
 
 fetch('http://jsonplaceholder.typicode.com/todos/1')
   .then((response) => response.json())
