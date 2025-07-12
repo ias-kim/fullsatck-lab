@@ -1,0 +1,16 @@
+{
+  "name": "st",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "parcel index_new.html",
+    "build": "parcel build index.html"
+  },
+  "author": "",
+  "license": "ISC",
+  "keywords": [],
+  "description": "",
+  "devDependencies": {
+    "@parcel/transformer-sass": "^2.15.2",
+    "parcel": "^2.15.2"
+  }
+}
