@@ -1,13 +1,12 @@
+CREATE DATABASE IF NOT EXISTS gsc CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+
+
+USE gsc;
+
+
 /**
   기준 정보 테이블 생성
  */
-
--- 1. 학기/연도 구분 테이블
-CREATE TABLE section (
-    sec_id CHAR(8) PRIMARY KEY,
-    semester TINYINT NOT NULL,
-    year YEAR NOT NULL
-);
 
 -- 2. 학년 테이블
 CREATE TABLE grades (
@@ -33,7 +32,7 @@ CREATE TABLE level_class (
     level_id CHAR(5) NOT NULL,
     name VARCHAR(20) NOT NULL,
     FOREIGN KEY (level_id) REFERENCES level(level_id)
-)
+);
 
 /**
   사용자 및 권한 관련 테이블
@@ -47,7 +46,7 @@ CREATE TABLE user_account (
     phone VARCHAR(20) UNIQUE,
     status ENUM('ACTIVE', 'INACTIVE') DEFAULT 'ACTIVE',
     refresh_token VARCHAR(200),
-    updated_at TIMESTAMP DEFAULT CURRENT_TIME ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- 2. 사용자 역할
@@ -81,7 +80,7 @@ CREATE TABLE professor_entity (
 -- 5. 관리자 정보
 CREATE TABLE admin_entity (
     admin_id VARCHAR(10) PRIMARY KEY,
-    user_id CHAR(10) NOT NULl UNIQUE,
+    user_id CHAR(10) NOT NULL UNIQUE,
     FOREIGN KEY (user_id) REFERENCES user_account(user_id)
 );
 
@@ -113,12 +112,12 @@ CREATE TABLE course_target (
     course_id CHAR(10) NOT NULL,
     grade_id CHAR(5) NOT NULL,
     level_id CHAR(5) NOT NULL,
-    --nationality_id CHAR(5) NOT NULL,
+    nationality_id CHAR(5) NOT NULL,
     FOREIGN KEY (course_id) REFERENCES course(course_id),
     FOREIGN KEY (grade_id) REFERENCES grades(grade_id),
     FOREIGN KEY (level_id) REFERENCES level(level_id),
-    --FOREIGN KEY (nationality_id) REFERENCES nationality(nationality_id);
-)
+    FOREIGN KEY (nationality_id) REFERENCES nationality(nationality_id)
+);
 
 -- 4. course_nationality 강의 수강 가능한 국적 (다대다)
 CREATE TABLE course_nationality (
@@ -126,8 +125,8 @@ CREATE TABLE course_nationality (
     nationality_id CHAR(5) NOT NULL,
     PRIMARY KEY (course_id, nationality_id),
     FOREIGN KEY (course_id) REFERENCES course(course_id),
-    FOREIGN KEY (nationality_id) REFERENCES nationality(nationality_id);
-)
+    FOREIGN KEY (nationality_id) REFERENCES nationality(nationality_id)
+);
 
 /**
     시간표 및 이벤트 관련 테이블
@@ -137,21 +136,15 @@ CREATE TABLE course_nationality (
 CREATE TABLE time_slot (
     time_slot_id CHAR(6) PRIMARY KEY,
     start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    --day ENUM('월', '화', '수', '목', '금')
+    end_time TIME NOT NULL
 );
 
 -- 2. 강의실 정보
 CREATE TABLE classroom (
     classroom_id CHAR(6) PRIMARY KEY,
     building VARCHAR(50) NOT NULL,
-    room_number VARCHAR(10) NOT NULL,
+    room_number VARCHAR(10) NOT NULL
 );
-
--- 3.정규 시간표
-CREATE TABLE timetable (
-
-)
 
 -- 3. 시간표 정보
 CREATE TABLE timetable (
@@ -187,12 +180,13 @@ CREATE TABLE notice (
     title VARCHAR(100) NOT NULL,
     content TEXT NOT NULL,
     course_id CHAR(10) NULL,
-    author_id CHAR(6) NOT NULL,
+    user_id CHAR(10) NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP,
     send_line BOOLEAN DEFAULT FALSE,
-    send_calendar BOOLEAN DEFAULT FASLE,
+    send_calendar BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (course_id) REFERENCES course(course_id),
-    FOREIGN KEY (author_id) REFERENCES user_account(author_id),
+    FOREIGN KEY (user_id) REFERENCES user_account(user_id)
 );
 
 -- 첨부파일
@@ -203,7 +197,7 @@ CREATE TABLE notice_attachments (
     file_url TEXT NOT NULL,
     uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (notice_id) REFERENCES notice(notice_id)
-)
+);
 
 -- notice_target - 공지 대상 지정
 CREATE TABLE notice_target (
@@ -213,7 +207,7 @@ CREATE TABLE notice_target (
     level_id CHAR(5),
     nationality_id CHAR(5),
     FOREIGN KEY (notice_id) REFERENCES notice(notice_id),
-    FOREIGN KEY (grade_id) REFERENCES grade(grade_id),
+    FOREIGN KEY (grade_id) REFERENCES grades(grade_id),
     FOREIGN KEY (level_id) REFERENCES level(level_id),
     FOREIGN KEY (nationality_id) REFERENCES nationality(nationality_id)
 );
@@ -223,17 +217,17 @@ CREATE TABLE notice_line (
     notice_id CHAR(10),
     student_id CHAR(10),
     sent_at DATETIME,
-    PRIMARY KEY (notice_id, sutudent_id),
+    PRIMARY KEY (notice_id, student_id),
     FOREIGN KEY (notice_id) REFERENCES notice(notice_id),
     FOREIGN KEY (student_id) REFERENCES student_entity(student_id)
 );
 
 -- ? notice calendar
 CREATE TABLE notice_calendar (
-                                 notice_id CHAR(10) PRIMARY KEY,
-                                 google_event_id VARCHAR(255),
-                                 html_link TEXT,
-                                 FOREIGN KEY (notice_id) REFERENCES notice(notice_id)
+    notice_id CHAR(10) PRIMARY KEY,
+    google_event_id VARCHAR(255),
+    html_link TEXT,
+    FOREIGN KEY (notice_id) REFERENCES notice(notice_id)
 );
 
 /**
@@ -248,8 +242,8 @@ CREATE TABLE notice_calendar (
      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
      is_verified BOOLEAN DEFAULT FALSE,
      FOREIGN KEY (user_id) REFERENCES user_account(user_id),
-     FOREIGN KEY (student_id) REFERENCES student_entity(student_id),
- )
+     FOREIGN KEY (student_id) REFERENCES student_entity(student_id)
+ );
 
  -- line-entity 사용자 정보 연동
 CREATE TABLE line_entity (
@@ -260,26 +254,79 @@ CREATE TABLE line_entity (
     receive_line_message BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (user_id) REFERENCES user_account(user_id),
     FOREIGN KEY (student_id) REFERENCES student_entity(student_id)
-)
+);
 
 -- 학생 과목 연결
 CREATE TABLE student_course (
-    course_id CHAR(15) NOT NULL,
+    course_id CHAR(10) NOT NULL,
     student_id CHAR(10) NOT NULL,
     course_by_line TEXT,
     PRIMARY KEY (course_id, student_id),
     FOREIGN KEY (course_id) REFERENCES course(course_id),
     FOREIGN KEY (student_id) REFERENCES student_entity(student_id)
-)
+);
 
 -- 교수 과목 연결
 CREATE TABLE course_professor (
-    author_id CHAR(10) NOT NULL,
     professor_id CHAR(10) NOT NULL,
-    course_id CHAR(15) NOT NULL,
+    course_id CHAR(10) NOT NULL,
     course_by_line TEXT,
-    PRIMARY KEY (author_id, professor_id, course_id),
-    FOREIGN KEY (author_id) REFERENCES author_entity(author_id),
+    PRIMARY KEY (professor_id, course_id),
     FOREIGN KEY (professor_id) REFERENCES professor_entity(professor_id),
     FOREIGN KEY (course_id) REFERENCES course(course_id)
 );
+
+/**
+  인증 / 사용자 관련 인덱스
+ */
+CREATE INDEX idx_user_status ON user_account(status);
+
+-- 권한
+CREATE INDEX idx_user_role_user_id ON user_role(user_id);
+
+/**
+  공지사항 인덱스
+ */
+CREATE INDEX idx_notice_course_id ON notice(course_id);
+CREATE INDEX idx_notice_user_id ON notice(user_id);
+CREATE INDEX idx_notice_created_at ON notice(created_at);
+
+-- 타겟
+CREATE INDEX idx_notice_target_notice_id ON notice_target(notice_id);
+CREATE INDEX idx_notice_target_grade ON notice_target(grade_id);
+CREATE INDEX idx_notice_target_level ON notice_target(level_id);
+CREATE INDEX idx_notice_target_nationality ON notice_target(nationality_id);
+
+-- 파일 첨부
+CREATE INDEX idx_notice_att_notice_id ON notice_attachments(notice_id);
+
+/**
+  시간표 관련 인덱스
+ */
+CREATE INDEX idx_timetable_course_id ON timetable(course_id);
+CREATE INDEX idx_timetable_day ON timetable(day);
+
+CREATE INDEX idx_course_event_date ON course_event(event_date);
+CREATE INDEX idx_course_event_type ON course_event(event_type);
+
+/**
+  강의 수업 관련
+ */
+CREATE INDEX idx_course_sec_id ON course(sec_id);
+CREATE INDEX idx_course_professor_id ON course(professor_id);
+CREATE INDEX idx_course_is_special ON course(is_special);
+
+-- 타겟
+CREATE INDEX idx_course_target_course_id ON course_target(course_id);
+
+/**
+  학생/교수/관리자 연결 관련 인덱스
+ */
+CREATE INDEX idx_student_user_id ON student_entity(user_id);
+CREATE INDEX idx_student_grade_id ON student_entity(grade_id);
+
+CREATE INDEX idx_cp_course_id ON course_professor(course_id);
+CREATE INDEX idx_cp_professor_id ON course_professor(professor_id);
+
+CREATE INDEX idx_sc_student_id ON student_course(student_id);
+CREATE INDEX idx_sc_course_id ON student_course(course_id);
