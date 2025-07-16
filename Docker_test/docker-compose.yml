@@ -1,16 +1,13 @@
-# 📦 개발용 Docker Compose 설정 (Vue + Express)
+#  개발용 Docker Compose 설정 (Vue + Express)
 # - 네트워크 역할 분리
 # - 마운트 및 설정파일 구조화
 # - 정적/동적 요청 분기 고려 (개발 단계에선 프록시 활용)
 
-# 운영/배포용: node:lts-alpine (단, 바이너리 빌드 시 주의 필요)
-version: "3.8"
 
 services:
   backend:
-    image: node:lts
+    build: ./backend
     container_name: dev_backend
-    working_dir: /app
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -18,17 +15,21 @@ services:
       - "5000:5000"
     command: sh -c "npm install && npm run dev"
     environment:
+      TZ: ${TIME_ZONE}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       NODE_ENV: development
+    networks:
+      - gsc
+    depends_on:
+      - db
 
   frontend:
-    image: node:lts
+    build: ./frontend
     container_name: dev_frontend
-    working_dir: /app
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -36,6 +37,31 @@ services:
       - "5173:5173"
     command: sh -c "npm install && npm run dev"
     environment:
+      TZ: ${TIME_ZONE}
       VITE_API_BASE_URL: http://localhost:5000
     depends_on:
       - backend
+    networks:
+      - gsc
+
+  db:
+    image: mysql:8.0
+    container_name: dev_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: gsc
+      TZ: ${TIME_ZONE}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db:/docker-entrypoint-initdb.d
+    networks:
+      - gsc
+
+networks:
+  gsc:
+    driver: bridge
+
+volumes:
+  db_data:
