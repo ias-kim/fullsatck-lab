@@ -11,7 +11,7 @@ var app = (module.exports = express());
 
 // 설정
 
-app.set('view engine', 'ejs'); // 텦플릿 엔진 설정
+app.set('views engine', 'ejs'); // 텦플릿 엔진 설정
 app.set('views', path.join(__dirname, 'views')); // 뷰 파일 디렉토리 설정
 
 // 미들웨어
