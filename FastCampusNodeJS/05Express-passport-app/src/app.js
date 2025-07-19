@@ -1,16 +1,21 @@
 const cookieSession = require('cookie-session');
 const express = require('express');
 const app = express();
-const passport = require('passport');
-const path = require('path');
+
 const { default: mongoose } = require('mongoose');
-const {
-  checkAuthenticated,
-  checkNotAuthenticated,
-} = require('./middlewares/auth.js');
-const User = require('./models/users.model.js');
 
 const cookieEncryptionKey = 'supersecret-key';
+mongoose.set('strictQuery', false);
+mongoose
+  .connect(
+    `mongodb+srv://abcqkdnxm:qwer1234@cluster0.nwynvnp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`,
+  )
+  .then(() => {
+    console.log('mongodb connected');
+  })
+  .catch((err) => {
+    console.log(err, 'mongodb disconnected');
+  });
 
 app.use(
   cookieSession({
@@ -18,6 +23,14 @@ app.use(
     keys: [cookieEncryptionKey],
   }),
 );
+
+const passport = require('passport');
+const path = require('path');
+const {
+  checkAuthenticated,
+  checkNotAuthenticated,
+} = require('./middlewares/auth.js');
+const User = require('./models/users.model.js');
 
 // register regenerate & save after the cookieSession middleware initialization
 app.use(function (request, response, next) {
@@ -44,18 +57,6 @@ app.use(express.urlencoded({ extended: false })); // form 파싱 후 해석
 //view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
-
-mongoose.set('strictQuery', false);
-mongoose
-  .connect(
-    `mongodb+srv://abcqkdnxm:qwer1234@cluster0.nwynvnp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`,
-  )
-  .then(() => {
-    console.log('mongodb connected');
-  })
-  .catch((err) => {
-    console.log(err, 'mongodb disconnected');
-  });
 
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
@@ -108,6 +109,15 @@ app.post('/logout', (req, res, next) => {
     res.redirect('/');
   });
 });
+
+app.get('/api/auth', passport.authenticate('google'));
+app.get(
+  '/api/auth/callback',
+  passport.authenticate('google', {
+    successReturnToOrRedirect: '/',
+    failureRedirect: '/login',
+  }),
+);
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Listening on port ${port}`);
