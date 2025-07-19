@@ -1,106 +1,138 @@
-import { Router } from 'express';
-import passport from '../auth/passport.js'; // import passport from our custom passport file
-// import * as AuthService from '../services/AuthService'; // assuming you have a service
-import jwt from 'jsonwebtoken';
+// Google Drive 및 Calendar의 읽기 전용 권한 범위입니다.
+import express from 'express';
+import session from 'express-session';
+import crypto from 'crypto';
+import url from 'url';
+import https from 'https';
+import http from 'http';
+import { google } from 'googleapis';
 
-const router = Router();
+const scopes = ['https://www.googleapis.com/auth/calendar.readonly'];
 
-const token = jwt.sign(
-  { id: user.id, email: user.email, jwtSecureCode: 'ff' },
-  process.env.JWT_SECRET,
-  { expiresIn: '1h' },
-);
-/*
-  This route triggers the Google sign-in/sign-up flow.
-  When the frontend calls it, the user will be redirected to the
-  Google accounts page to log in with their Google account.
-*/
-// Google OAuth2.0 route
-router.get(
-  '/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    accessType: 'offline',
-    prompt: 'consent',
-  }),
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_ID,
+  process.env.GOOGLE_SECRET,
+  process.env.GOOGLE_REDIRECT_URL,
 );
 
-router.get(
-  '/google/callback',
-  passport.authenticate('google', { session: false }),
-  (req, res) => {
-    try {
-      const user = req.user; // 여기 user는 verify 함수에서 만든 더미 유저임
+console.log('Client ID:', process.env.GOOGLE_ID); // 추가
 
-      // 1. 더미용 secureCode 생성 (실제 서비스에서는 DB에서 가져옴)
-      const dummyJwtSecureCode = 'mock-code';
+/* 사용자 인증 정보를 저장하는 전역 변수입니다.
+ */
+let userCredential = null;
 
-      // 2. JWT payload 구성
-      const payload = {
-        id: user.id,
-        email: user.email,
-        jwtSecureCode: dummyJwtSecureCode, // 이건 검증할 때도 쓰임
-      };
+async function main() {
+  const app = express();
 
-      // 3. JWT 서명
-      const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret-test', {
-        expiresIn: '1h',
-      });
+  app.use(
+    session({
+      secret: process.env.GOOGLE_SECRET, // Replace with a strong secret
+      resave: false,
+      saveUninitialized: false,
+    }),
+  );
 
-      // 4. 클라이언트로 응답
-      return res.json({ token });
-    } catch (error) {
-      return res
-        .status(500)
-        .json({ message: 'An error occurred during authentication', error });
+  // 사용자를 Google OAuth 2.0 서버로 리디렉션하는 예시입니다.
+  app.get('/api/auth', async (req, res) => {
+    // CSRF 방지를 위한 보안 상태 문자열 생성
+    const state = crypto.randomBytes(32).toString('hex');
+    // 세션에 상태 값을 저장
+    req.session.state = state;
+
+    // 사용 권한을 요청하는 인증 URL 생성
+    const authorizationUrl = oauth2Client.generateAuthUrl({
+      // 'online' (기본값) 또는 'offline' (refresh_token 발급)
+      access_type: 'offline',
+      /** 위에 정의된 scopes 배열 전달.
+       * 하나의 권한만 필요하면 문자열로 전달 가능 */
+      scope: scopes,
+      // 점진적 권한 부여 활성화. 권장되는 모범 사례입니다.
+      include_granted_scopes: true,
+      // CSRF 공격 위험 감소를 위한 state 파라미터 포함
+      state: state,
+    });
+
+    res.redirect(authorizationUrl);
+  });
+
+  // Google OAuth 2.0 서버에서 콜백을 수신합니다.
+  app.get('/api/auth/callback', async (req, res) => {
+    // OAuth 2.0 서버 응답 처리
+    let q = url.parse(req.url, true).query;
+
+    if (q.error) {
+      // 에러 응답 처리 (예: error=access_denied)
+      console.log('Error:' + q.error);
+    } else if (q.state !== req.session.state) {
+      // state 값 검증
+      console.log('State mismatch. Possible CSRF attack');
+      res.end('State mismatch. Possible CSRF attack');
+    } else {
+      try {
+        // access_token 및 refresh_token을 가져옵니다.
+        let { tokens } = await oauth2Client.getToken(q.code);
+        console.log('토큰', tokens);
+        oauth2Client.setCredentials(tokens);
+
+        /** 토큰을 전역 변수에 저장합니다. 실제 앱에서는 DB에 저장하는 것이 좋습니다. */
+        userCredential = tokens;
+        res.send('인증완료');
+        return;
+
+        if (
+          tokens.scope.includes(
+            'https://www.googleapis.com/auth/calendar.readonly',
+          )
+        ) {
+          console.log('Calendar scope granted');
+        } else {
+          console.log('Calendar scope NOT granted');
+        }
+      } catch (error) {
+        console.log(error);
+        res.status(500).end('Error');
+      }
     }
-  },
-);
-// router.get(
-//   '/google/callback',
-//   passport.authenticate('google', { session: false }),
-//   (req, res) => {
-//     try {
-//       const user = req.user;
-//       const { authToken } = AuthService.handleGoogleCallback({
-//         id: user.id,
-//         email: user.email,
-//       });
-//       const redirectUrl = `${process.env.BE_BASE_URL}?accessToken=${authToken}`;
-//       return res.redirect(redirectUrl);
-//     } catch (error) {
-//       return res
-//         .status(500)
-//         .json({ message: 'An error occurred during authentication' });
-//     }
-//   },
-// );
+  });
 
-export default router;
+  // 토큰을 철회하는 예시
+  app.get('/revoke', async (req, res) => {
+    // POST 요청을 위한 데이터 문자열 생성
+    let postData = 'token=' + userCredential.access_token;
 
-// // 루트 페이지
-// app.get('/', (req, res) => {
-//   res.send(`
-//         <h1>Login</h1>
-//         <a href="/google">login </a>
-//     `);
-// });
-//
-// // 로그인 버튼을 누르면 도착하는 목적지 라우터
-// // 모든 로직을 처리한 뒤 구글 인증 서버 https://accounts.google.com/o/oauth2/v2/auth
-// app.get('/google', (req, res) => {
-//   let url = 'https://accounts.google.com/o/oauth/v2/auth?';
-//   url += `client_id=${GOOGLE_CLIENT_ID}`;
-//   url += `&redirect_uri=${GOOGLE_REDIRECT_URI}`;
-//   url += `&response_type=code`;
-//   url += `&scope=openid%20email&20profile`;
-//   url += `&access_type=offline`;
-//   url += `&prompt=consent`;
-//   res.redirect(url);
-// });
-//
-// app.get('/auth/callback', (req, res) => {
-//   const { code } = req.query;
-//   console.log(`code: ${code}`);
-//   res.send('ok');
-// });
+    // POST 요청 옵션 설정
+    let postOptions = {
+      host: 'oauth2.googleapis.com',
+      port: '443',
+      path: '/revoke',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    };
+
+    // 요청 객체 설정
+    const postReq = https.request(postOptions, function (res) {
+      res.setEncoding('utf8');
+      res.on('data', (d) => {
+        console.log('Response: ' + d);
+      });
+    });
+
+    postReq.on('error', (error) => {
+      console.log(error);
+    });
+
+    // 데이터와 함께 요청 전송
+    postReq.write(postData);
+    postReq.end();
+  });
+
+  const server = http.createServer(app);
+  server.listen(3000);
+}
+
+main().catch(console.error);
+
+export default main;
