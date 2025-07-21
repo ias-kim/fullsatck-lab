@@ -54,7 +54,7 @@ hash({ password: 'foobar' }, function (err, pass, salt, hash) {
   users.tj.hash = hash;
 });
 
-// 사용자 인증 함수 - 임시 객체 db 사용
+// 사용자 인증 함수 - 임시 객체 config 사용
 
 function authenticate(name, pass, fn) {
   if (!module.parent) console.log('authenticating %s:%s', name, pass);
