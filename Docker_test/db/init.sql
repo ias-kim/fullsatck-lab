@@ -1,3 +1,6 @@
+ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY 'root';
+FLUSH PRIVILEGES;
+
 CREATE DATABASE IF NOT EXISTS gsc CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 
 
@@ -41,10 +44,11 @@ CREATE TABLE level_class (
 -- 1. 공통 사용자 정보
 CREATE TABLE user_account (
     user_id CHAR(10) PRIMARY KEY,
+    google_id VARCHAR(255) UNIQUE,
     name VARCHAR(50) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     phone VARCHAR(20) UNIQUE,
-    status ENUM('ACTIVE', 'INACTIVE') DEFAULT 'ACTIVE',
+    status ENUM('ACTIVE', 'INACTIVE') DEFAULT 'INACTIVE',
     refresh_token VARCHAR(200),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -59,8 +63,7 @@ CREATE TABLE user_role (
 
 -- 3. 학생 정보
 CREATE TABLE student_entity (
-    student_id VARCHAR(10) PRIMARY KEY,
-    user_id CHAR(10) NOT NULL UNIQUE,
+    user_id VARCHAR(10) PRIMARY KEY,
     grade_id CHAR(5),
     class_id CHAR(5),
     nationality_id CHAR(5),
@@ -219,7 +222,7 @@ CREATE TABLE notice_line (
     sent_at DATETIME,
     PRIMARY KEY (notice_id, student_id),
     FOREIGN KEY (notice_id) REFERENCES notice(notice_id),
-    FOREIGN KEY (student_id) REFERENCES student_entity(student_id)
+    FOREIGN KEY (student_id) REFERENCES student_entity(user_id)
 );
 
 -- ? notice calendar

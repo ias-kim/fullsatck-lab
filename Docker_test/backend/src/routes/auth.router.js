@@ -1,10 +1,10 @@
-// Google Drive 및 Calendar의 읽기 전용 권한 범위입니다.
 import express from 'express';
 import dotenv from 'dotenv';
+import authController from '../controllers/auth.controller.js';
+import refreshController from '../controllers/refresh.controller.js';
+import authJwt from '../middlewares/authJWT.js';
 
 dotenv.config();
-
-const authController = require('../controllers/auth.controller.js');
 
 export const authRouter = express.Router();
 
@@ -18,5 +18,19 @@ authRouter.get('/callback', authController.authCallback);
 authRouter.get('/revoke', authController.authRevoke);
 
 authRouter.get('/logout', authController.authLogout);
+
+authRouter.post('/dashboard', authJwt, (req, res) => {
+  return res.status(200).json({
+    message: 'Success',
+    user: {
+      id: req.user.id,
+      name: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
+      status: req.user.status,
+    },
+  });
+});
+authRouter.post('/refresh', refreshController.refresh);
 
 export default authRouter;

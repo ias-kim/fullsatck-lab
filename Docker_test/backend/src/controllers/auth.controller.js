@@ -2,12 +2,13 @@ import crypto from 'crypto';
 import url from 'url';
 import https from 'https';
 import { google } from 'googleapis';
-import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import redisClient from '../config/redis.js';
+import { refresh, sign } from '../utils/jwt-util.js';
+import { createUser } from '../models/user.model.js';
+import axios from 'axios';
 
 dotenv.config();
-
-const model = require('../models/auth.model.js');
 
 const scopes = ['https://www.googleapis.com/auth/calendar.readonly'];
 
@@ -35,7 +36,7 @@ async function googleAuthRedirect(req, res) {
     /** 위에 정의된 scopes 배열 전달.
      * 하나의 권한만 필요하면 문자열로 전달 가능 */
     scope: scopes,
-    // 점진적 권한 부여 활성화. 권장되는 모범 사례입니다.
+    // 점진적 권한 부여 활성화. 권장되는 모범 사례
     include_granted_scopes: true,
     // CSRF 공격 위험 감소를 위한 state 파라미터 포함
     state,
@@ -49,9 +50,7 @@ async function googleAuthRedirect(req, res) {
 async function authCallback(req, res) {
   // OAuth 2.0 서버 응답 처리
   let q = url.parse(req.url, true).query;
-  const token = jwt.sign({ user: req.user }, process.env.JWT_SECRET, {
-    expiresIn: '1h',
-  });
+
   if (q.error) {
     // 에러 응답 처리 (예: error=access_denied)
     console.log('Error:' + q.error);
@@ -61,17 +60,42 @@ async function authCallback(req, res) {
     res.end('State mismatch. Possible CSRF attack');
   } else {
     try {
-      res.cookie('jwtToken', token);
-      // access_token 및 refresh_token을 가져옵니다.
+      // Google로부터 토큰 받기
       const { tokens } = await oauth2Client.getToken(q.code);
-      console.log('토큰', tokens);
-      console.log('jwt token:', token);
-      oauth2Client.setCredentials(tokens);
+      console.log('받은 토큰', tokens);
 
-      /** 토큰을 전역 변수에 저장합니다. 실제 앱에서는 DB에 저장하는 것이 좋습니다. */
-      userCredential = tokens;
-      return;
+      const userInfoResponse = await axios.get(
+        'https://www.googleapis.com/oauth2/v2/userinfo',
+        {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`,
+          },
+        },
+      );
+      const userInfo = userInfoResponse.data;
+      console.log('구글 사용자 정보', userInfo);
 
+      // 사용자 정보와 Google refresh Token을 db에 저장/업데이트
+      // 사용자 DB 처리: 없으면 insert, 있으면 조회
+      const userPayload = {
+        googleId: userInfo.id,
+        email: userInfo.email,
+        googleRefreshToken: tokens.refresh_token, // google refresh Token
+      };
+      const user = await createUser(userPayload);
+
+      //  JWT 생성
+      const accessToken = sign(user); // 앱의 Access Token
+      const refreshToken = refresh(); // 앱의 Refresh Token
+
+      // Refresh Token을 Redis에 저장
+      await redisClient.set(user.id.toString(), refreshToken, {
+        EX: 14 * 24 * 60 * 60, // 14일 유효기간 설정
+      });
+
+      // 쿠키
+      res.cookie('accessToken', accessToken, { httpOnly: true });
+      res.redirect('/dashboard'); // spa frontend route
       if (
         tokens.scope.includes(
           'https://www.googleapis.com/auth/calendar.readonly',
@@ -82,8 +106,8 @@ async function authCallback(req, res) {
         console.log('Calendar scope NOT granted');
       }
     } catch (error) {
-      console.log(error);
-      res.status(500).end('Error');
+      console.error('OAuth Callbackk Error', error);
+      res.status(500).json({ message: '인증 처리 중 오류가 발생' });
     }
   }
 }
@@ -123,13 +147,18 @@ async function authRevoke(req, res) {
 }
 
 async function authLogout(req, res, next) {
-  req.logout(function (err) {
-    if (err) return next(err);
-    res.redirect('/');
-  });
+  try {
+    const userId = req.user?.id;
+    if (userId) {
+      await redisClient.del(userId.toString());
+    }
+    req.logout(() => res.redirect('/'));
+  } catch (err) {
+    next(err);
+  }
 }
 
-module.exports = {
+export default {
   googleAuthRedirect,
   authCallback,
   authRevoke,

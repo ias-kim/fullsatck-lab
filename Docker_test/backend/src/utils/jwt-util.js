@@ -1,0 +1,67 @@
+import { promisify } from 'util';
+import jwt from 'jsonwebtoken';
+import redisClient from '../config/redis.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
+const secret = process.env.JWT_SECRET;
+
+// ESM 방식 export로 전체 함수 묶어서 내보내기
+export const sign = (user) => {
+  const payload = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+  };
+
+  return jwt.sign(payload, secret, {
+    algorithm: 'HS256',
+    expiresIn: '1h',
+  });
+};
+
+export const verify = (token) => {
+  try {
+    const decoded = jwt.verify(token, secret);
+    return {
+      ok: true,
+      id: decoded.id,
+      name: decoded.name,
+      email: decoded.email,
+      role: decoded.role,
+      status: decoded.status,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err.message,
+    };
+  }
+};
+
+export const refresh = () => {
+  return jwt.sign({}, secret, {
+    algorithm: 'HS256',
+    expiresIn: '14d',
+  });
+};
+
+export const refreshVerify = async (token, userId) => {
+  const getAsync = promisify(redisClient.get).bind(redisClient);
+  try {
+    const data = await getAsync(userId);
+    if (token === data) {
+      try {
+        jwt.verify(token, secret);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
