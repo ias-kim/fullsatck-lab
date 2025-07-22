@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://knockoutjs.com/downloads/knockout-3.5.1.js"></script>
+</head>
+<body>
+
+<input id="todo-input" data-bind="event:{keydown:할일추가}" type="text" placeholder="할 일을 입력 해주세요."/>
+
+<!-- 할 일 목록 표시 - 입력된 할 일을 목록 형태로 보여주는 기능 -->
+<ol id="todo-list" data-bind="foreach:filterdTodos">
+    <li class="todo" data-bind="css:{completed, editing: $data === $parent.editingTodo()}">
+        <input type="checkbox" data-bind="attr:{checked:completed}, click:$parent.할일완료토글.bind($parent)">
+        <span data-bind="text:title, event:{dblclick:$parent.할일수정.bind($parent)}"></span>
+        <button data-bind="click:$parent.할일삭제.bind($parent)">X</button>
+
+        <!-- 6. 할일 수정 기능 -->
+        <input type="text" class="todo-edit-input"
+               data-bind="{
+               textInput:$parent.editingTitle,
+               hasFocus: $data === $parent.editingTodo(),
+               event: {keydown:$parent.할일제목수정.bind($parent), blur:$parent.할일제목수정취소.bind($parent)}
+               }"
+        />
+    </li>
+</ol>
+
+<div>남은 할일: <span data-bind="text: num_reamining_todos">0</span></div>
+<hr>
+<div>
+    <div data-bind="text:visibilityFilter"></div>
+    <button data-bind="click:전체보기">전체</button>
+    <button data-bind="click:해야할일보기">해야할</button>
+    <button data-bind="click:완료한일보기">완료</button>
+</div>
+<hr>
+<div>
+    <button data-bind="click:전체완료토클">전체 완료 토글</button>
+    <button data-bind="click:완료된할일삭제">완료된 할일 삭제</button>
+</div>
+<script>
+    class ViewModel {
+        constructor() {
+            // Model
+            // 1. 할 일 목록 생성
+            // 2. 할 일 목록 표시
+            const initTodos = JSON.parse(localStorage.getItem('todo-knockout.js'), '[]');
+            this.todos = ko.observableArray(initTodos)
+
+            // 4. 할 일 개수 표시
+            this.num_reamining_todos = ko.computed(() => {
+                return this.todos().filter(todo => !todo.completed).length
+            })
+
+            // 6. 할 일 수정
+            this.editingTodo = ko.observable(null)
+            this.editingTitle = ko.observable("")
+
+            this.visibilityFilter = ko.observable("ALL")
+
+            // 할일 필터링
+            this.filterdTodos = ko.computed(() => {
+                switch (this.visibilityFilter) {
+                    case "ALL":
+                        return this.todos()
+                    case "ACTIVE":
+                        return this.todos().filter(todo => !todo.completed)
+                    case "COMPLETED":
+                        return this.todos().filter(todo => todo.completed)
+                }
+            })
+
+            // 지속성
+            ko.computed(() => {
+                const data = JSON.stringify(this.todos())
+                localStorage.setItem('todo-knockout.js', data);
+            })
+        }
+
+        할일추가(viewModel, event) {
+            if (event.originalEvent.isComposing) return true
+            if (event.key === "Enter") return true
+
+            const title = event.target.value
+            this.todos.push({title, completed: false})
+
+            event.target.value = ""
+        }
+
+        // 3. 할 일 완료 표시
+        할일완료토글(todo) {
+            const newTodo = {...todo, completed: !todo.completed}
+            this.todos.replace(todo, newTodo)
+        }
+
+        // 5. 할일 삭제
+        할일삭제(todo) {
+            this.todos.remove(todo);
+        }
+
+        할일수정(todo) {
+            this.editingTodo(todo);
+            this.editingTitle(todo.title);
+        }
+
+        할일제목수정(todo, event) {
+            if (event.originalEvent.isComposing) return true
+            if (event.key === "Enter") return true
+
+            const title = this.editingTitle()
+            this.todos.replace(todo, title)
+            this.editingTodo(null)
+            this.editingTitle("")
+        }
+
+
+        할일제목수정취소(todo, event) {
+            this.editingTodo(null)
+            this.editingTitle("")
+        }
+
+        전체보기() {
+            this.visibilityFilter("ALL")
+        }
+
+        해야할일보기() {
+            this.visibilityFilter("ACTIVE")
+        }
+
+        완료한일보기() {
+            this.visibilityFilter("COMPLETED")
+        }
+
+        // 8. 할 일 일관 완료 기능
+        전체완료토클() {
+            const isAllCompleted = this.todos().every(todo => todo.completed)
+            this.todos(this.todos().map(todo => ({...todo, completed: !isAllCompleted})))
+        }
+
+        완료된할일삭제() {
+            this.todos(this.todos().filter(todo => !todo.completed))
+        }
+
+    }
+
+    ko.applyBindings(new ViewModel());
+
+    // 7. 할 일 필터링
+
+
+</script>
+</body>
+</html>
