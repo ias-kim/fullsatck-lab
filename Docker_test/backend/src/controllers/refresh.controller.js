@@ -2,10 +2,17 @@ import { refreshVerify, sign, verify } from '../utils/jwt-util.js';
 import jwt from 'jsonwebtoken';
 
 const refresh = async (req, res) => {
+  console.log(
+    'All headers',
+    req.headers['authorization'],
+    req.headers['refresh'],
+  );
   // access token과 refresh token의 존재 유무를 체크
-  if (req.headers.authorization && req.headers.refresh) {
-    const accessToken = req.headers.authorization.split('Bearer ')[1];
-    const refreshToken = req.headers.refresh;
+  if (req.headers['authorization'] && req.headers['refresh']) {
+    const accessToken = req.headers['authorization'].split('Bearer ')[1];
+    const refreshToken = req.headers['refresh'];
+    console.log('accessToken', accessToken);
+    console.log('refreshToken', refreshToken);
 
     // access token 검증 -> expired여야 함
     const authResult = verify(accessToken);

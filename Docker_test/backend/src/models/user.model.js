@@ -9,16 +9,34 @@ export const findByEmail = async (email) => {
 };
 
 export const createUser = async (userInfo) => {
-  const { user_id, name, email, googleId } = userInfo;
+  const {
+    user_id = '2423008',
+    name = 'kim',
+    email,
+    status = 'INACTIVE',
+    googleId,
+  } = userInfo;
+
+  // 이미 존재하는지 확인
+  const existing = await findByEmail(email);
+  if (existing) {
+    throw new Error('이미 가입된 사용자입니다.');
+  }
+
   const sql = `
         INSERT INTO user_account (user_id, name, email, status, google_id)
-        VALUES (?, ?, ?, 'INACTIVE', ?)
+        VALUES (?, ?, ?, ?, ?)
     `;
 
-  const [result] = await pool
-    .promise()
-    .query(sql, [user_id, name, email, googleId]);
-  return result.insertId;
+  await pool.promise().query(sql, [user_id, name, email, status, googleId]);
+
+  return {
+    user_id,
+    name,
+    email,
+    status,
+    googleId,
+  };
 };
 
 export default {

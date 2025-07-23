@@ -9,7 +9,7 @@ const secret = process.env.JWT_SECRET;
 // ESM 방식 export로 전체 함수 묶어서 내보내기
 export const sign = (user) => {
   const payload = {
-    id: user.id,
+    user_id: user.user_id,
     name: user.name,
     email: user.email,
     role: user.role,
@@ -18,7 +18,7 @@ export const sign = (user) => {
 
   return jwt.sign(payload, secret, {
     algorithm: 'HS256',
-    expiresIn: '1h',
+    expiresIn: '30s',
   });
 };
 
@@ -27,7 +27,7 @@ export const verify = (token) => {
     const decoded = jwt.verify(token, secret);
     return {
       ok: true,
-      id: decoded.id,
+      user_id: decoded.user_id,
       name: decoded.name,
       email: decoded.email,
       role: decoded.role,
@@ -51,17 +51,19 @@ export const refresh = () => {
 export const refreshVerify = async (token, userId) => {
   const getAsync = promisify(redisClient.get).bind(redisClient);
   try {
-    const data = await getAsync(userId);
-    if (token === data) {
+    const data = await getAsync(`session:${userId}`);
+    if (data && token === data) {
       try {
         jwt.verify(token, secret);
         return true;
-      } catch {
+      } catch (err) {
+        console.warn('JWT 검증 실패:', err.message);
         return false;
       }
     }
     return false;
-  } catch {
+  } catch (err) {
+    console.warn('Redis 확인 실패', err.message);
     return false;
   }
 };

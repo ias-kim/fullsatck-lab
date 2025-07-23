@@ -49,7 +49,6 @@ CREATE TABLE user_account (
     email VARCHAR(100) NOT NULL UNIQUE,
     phone VARCHAR(20) UNIQUE,
     status ENUM('ACTIVE', 'INACTIVE') DEFAULT 'INACTIVE',
-    refresh_token VARCHAR(200),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
@@ -75,15 +74,13 @@ CREATE TABLE student_entity (
 
 -- 4. 교수 정보
 CREATE TABLE professor_entity (
-    professor_id VARCHAR(10) PRIMARY KEY,
-    user_id CHAR(10) NOT NULL UNIQUE,
+    user_id CHAR(10) PRIMARY KEY,
     FOREIGN KEY (user_id) REFERENCES user_account(user_id)
 );
 
 -- 5. 관리자 정보
 CREATE TABLE admin_entity (
-    admin_id VARCHAR(10) PRIMARY KEY,
-    user_id CHAR(10) NOT NULL UNIQUE,
+    user_id CHAR(10) PRIMARY KEY,
     FOREIGN KEY (user_id) REFERENCES user_account(user_id)
 );
 
@@ -104,18 +101,18 @@ CREATE TABLE course (
     title VARCHAR(100) NOT NULL,
     is_special BOOLEAN DEFAULT FALSE,
     sec_id CHAR(8) NOT NULL,
-    professor_id CHAR(10),
+    user_id CHAR(10),
     FOREIGN KEY (sec_id) REFERENCES section(sec_id),
-    FOREIGN KEY (professor_id) REFERENCES professor_entity(professor_id)
+    FOREIGN KEY (user_id) REFERENCES professor_entity(user_id)
 );
 
 -- 3. course_target 강의 대상 필터 (학년/레벨 하나만 존재)
 CREATE TABLE course_target (
     target_id CHAR(10) PRIMARY KEY,
     course_id CHAR(10) NOT NULL,
-    grade_id CHAR(5) NOT NULL,
-    level_id CHAR(5) NOT NULL,
-    nationality_id CHAR(5) NOT NULL,
+    grade_id CHAR(5),
+    level_id CHAR(5),
+    nationality_id CHAR(5),
     FOREIGN KEY (course_id) REFERENCES course(course_id),
     FOREIGN KEY (grade_id) REFERENCES grades(grade_id),
     FOREIGN KEY (level_id) REFERENCES level(level_id),
@@ -218,11 +215,11 @@ CREATE TABLE notice_target (
 -- notice_line 라인 전송 전송
 CREATE TABLE notice_line (
     notice_id CHAR(10),
-    student_id CHAR(10),
+    user_id CHAR(10),
     sent_at DATETIME,
-    PRIMARY KEY (notice_id, student_id),
+    PRIMARY KEY (notice_id, user_id),
     FOREIGN KEY (notice_id) REFERENCES notice(notice_id),
-    FOREIGN KEY (student_id) REFERENCES student_entity(user_id)
+    FOREIGN KEY (user_id) REFERENCES student_entity(user_id)
 );
 
 -- ? notice calendar
@@ -241,41 +238,37 @@ CREATE TABLE notice_calendar (
  CREATE TABLE line_auth_token (
      token CHAR(6) PRIMARY KEY,
      user_id CHAR(10) NOT NULL,
-     student_id CHAR(10) NOT NULL,
      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
      is_verified BOOLEAN DEFAULT FALSE,
-     FOREIGN KEY (user_id) REFERENCES user_account(user_id),
-     FOREIGN KEY (student_id) REFERENCES student_entity(student_id)
+     FOREIGN KEY (user_id) REFERENCES student_entity(user_id)
  );
 
  -- line-entity 사용자 정보 연동
 CREATE TABLE line_entity (
-    student_id CHAR(10) PRIMARY KEY,
-    user_id CHAR(10) NOT NULL,
+    user_id CHAR(10) PRIMARY KEY,
     line_id VARCHAR(50) UNIQUE NOT NULL, -- LINE UID (UXXXXXX) 형태
     linked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     receive_line_message BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (user_id) REFERENCES user_account(user_id),
-    FOREIGN KEY (student_id) REFERENCES student_entity(student_id)
+    FOREIGN KEY (user_id) REFERENCES student_entity(user_id)
 );
 
 -- 학생 과목 연결
 CREATE TABLE student_course (
     course_id CHAR(10) NOT NULL,
-    student_id CHAR(10) NOT NULL,
+    user_id CHAR(10) NOT NULL,
     course_by_line TEXT,
-    PRIMARY KEY (course_id, student_id),
+    PRIMARY KEY (course_id, user_id),
     FOREIGN KEY (course_id) REFERENCES course(course_id),
-    FOREIGN KEY (student_id) REFERENCES student_entity(student_id)
+    FOREIGN KEY (user_id) REFERENCES student_entity(user_id)
 );
 
 -- 교수 과목 연결
 CREATE TABLE course_professor (
-    professor_id CHAR(10) NOT NULL,
+    user_id CHAR(10) NOT NULL,
     course_id CHAR(10) NOT NULL,
     course_by_line TEXT,
-    PRIMARY KEY (professor_id, course_id),
-    FOREIGN KEY (professor_id) REFERENCES professor_entity(professor_id),
+    PRIMARY KEY (user_id, course_id),
+    FOREIGN KEY (user_id) REFERENCES professor_entity(user_id),
     FOREIGN KEY (course_id) REFERENCES course(course_id)
 );
 
@@ -316,7 +309,7 @@ CREATE INDEX idx_course_event_type ON course_event(event_type);
   강의 수업 관련
  */
 CREATE INDEX idx_course_sec_id ON course(sec_id);
-CREATE INDEX idx_course_professor_id ON course(professor_id);
+CREATE INDEX idx_course_professor_id ON course(user_id);
 CREATE INDEX idx_course_is_special ON course(is_special);
 
 -- 타겟
@@ -329,7 +322,7 @@ CREATE INDEX idx_student_user_id ON student_entity(user_id);
 CREATE INDEX idx_student_grade_id ON student_entity(grade_id);
 
 CREATE INDEX idx_cp_course_id ON course_professor(course_id);
-CREATE INDEX idx_cp_professor_id ON course_professor(professor_id);
+CREATE INDEX idx_cp_professor_id ON course_professor(user_id);
 
-CREATE INDEX idx_sc_student_id ON student_course(student_id);
+CREATE INDEX idx_sc_student_id ON student_course(user_id);
 CREATE INDEX idx_sc_course_id ON student_course(course_id);

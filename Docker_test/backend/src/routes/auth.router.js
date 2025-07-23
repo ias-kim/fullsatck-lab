@@ -20,10 +20,16 @@ authRouter.get('/revoke', authController.authRevoke);
 authRouter.get('/logout', authController.authLogout);
 
 authRouter.post('/dashboard', authJwt, (req, res) => {
+  console.log(
+    'decoded user from token:',
+    req.user.user_id,
+    req.user.name,
+    req.user.email,
+  );
   return res.status(200).json({
     message: 'Success',
     user: {
-      id: req.user.id,
+      user_id: req.user.user_id,
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,

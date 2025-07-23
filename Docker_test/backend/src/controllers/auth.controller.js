@@ -10,7 +10,11 @@ import axios from 'axios';
 
 dotenv.config();
 
-const scopes = ['https://www.googleapis.com/auth/calendar.readonly'];
+const scopes = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email',
+];
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_ID,
@@ -65,7 +69,7 @@ async function authCallback(req, res) {
       console.log('받은 토큰', tokens);
 
       const userInfoResponse = await axios.get(
-        'https://www.googleapis.com/oauth2/v2/userinfo',
+        `https://www.googleapis.com/oauth2/v2/userinfo`,
         {
           headers: {
             Authorization: `Bearer ${tokens.access_token}`,
@@ -82,14 +86,18 @@ async function authCallback(req, res) {
         email: userInfo.email,
         googleRefreshToken: tokens.refresh_token, // google refresh Token
       };
-      const user = await createUser(userPayload);
+      console.log('값 확인', userPayload.googleId);
+      console.log('값 이메일', userPayload.email);
 
+      const result = await createUser(userPayload);
+      const userId = result.user_id;
+      console.log(userId);
       //  JWT 생성
-      const accessToken = sign(user); // 앱의 Access Token
+      const accessToken = sign(result); // 앱의 Access Token
       const refreshToken = refresh(); // 앱의 Refresh Token
 
       // Refresh Token을 Redis에 저장
-      await redisClient.set(user.id.toString(), refreshToken, {
+      await redisClient.set(`session:${userId}`, refreshToken, {
         EX: 14 * 24 * 60 * 60, // 14일 유효기간 설정
       });
 
