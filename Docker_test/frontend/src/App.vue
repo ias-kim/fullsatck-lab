@@ -1,9 +1,14 @@
-<script setup></script>
+<script setup>
+import { computed, ref } from 'vue';
+
+const numbers = ref([1, 2, 3, 4, 5]);
+const eventNumbers = computed(() => {
+  return numbers.value.filter((n) => n % 2 !== 0);
+});
+</script>
 
 <template>
-  <span>메시지: {{ msg }}</span>
-  <p>텍스트 보간 사용: {{ rawHtml }}</p>
-  <p>v-html 디렉티브 사용 <span v-html="rawHtml"></span></p>
+  <li v-for="n in eventNumbers">{{ n }}</li>
 </template>
 
 <style scoped>
