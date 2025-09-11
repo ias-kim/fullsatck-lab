@@ -39,19 +39,12 @@ CREATE TABLE user_account (
                               name          VARCHAR(100) NOT NULL,
                               email         VARCHAR(200),
                               phone         VARCHAR(50),
+                              role_type ENUM('student', 'professor', 'admin') NOT NULL DEFAULT 'student',
                               status        ENUM('active','inactive','pending') NOT NULL DEFAULT 'pending',
                               refresh_token VARCHAR(255),
                               updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                               UNIQUE KEY ux_user_email (email),
                               UNIQUE KEY ux_user_phone (phone)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE user_role (
-                           user_id   BIGINT UNSIGNED NOT NULL,
-                           role_type ENUM('student','professor','admin') NOT NULL,
-                           PRIMARY KEY (user_id, role_type),
-                           KEY ix_user_role_type (role_type),
-                           CONSTRAINT fk_user_role_user FOREIGN KEY (user_id) REFERENCES user_account(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE student_entity (
@@ -329,7 +322,6 @@ CREATE TABLE weekend_attendance_votes (
 -- =========================================================
 CREATE TABLE cleaning_assignment (
                                      assignment_id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                                     sec_id        VARCHAR(8) NOT NULL,
                                      grade_id      VARCHAR(20) NOT NULL,
                                      classroom_id  VARCHAR(6) NOT NULL,
                                      work_date     DATE NOT NULL,
@@ -338,9 +330,8 @@ CREATE TABLE cleaning_assignment (
                                      status        ENUM('SCHEDULED','DONE','MISSED','CANCELLED') NOT NULL DEFAULT 'SCHEDULED',
                                      created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
                                      confirmed_at  DATETIME,
-                                     UNIQUE KEY ux_cleaning_scope_day (sec_id, grade_id, classroom_id, work_date),
+                                     UNIQUE KEY ux_cleaning_scope_day (grade_id, classroom_id, work_date),
                                      KEY ix_cleaning_date (work_date),
-                                     CONSTRAINT fk_clean_sec   FOREIGN KEY (sec_id) REFERENCES section(sec_id),
                                      CONSTRAINT fk_clean_grade FOREIGN KEY (grade_id) REFERENCES grade(grade_id),
                                      CONSTRAINT fk_clean_room  FOREIGN KEY (classroom_id) REFERENCES classroom(classroom_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
