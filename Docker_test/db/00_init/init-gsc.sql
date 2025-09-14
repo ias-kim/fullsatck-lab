@@ -47,13 +47,21 @@ CREATE TABLE user_account (
                               UNIQUE KEY ux_user_phone (phone)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE user_role (
+                           user_id   BIGINT UNSIGNED NOT NULL,
+                           role_type ENUM('student','professor','admin') NOT NULL,
+                           PRIMARY KEY (user_id, role_type),
+                           KEY ix_user_role_type (role_type),
+                           CONSTRAINT fk_user_role_user FOREIGN KEY (user_id) REFERENCES user_account(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE student_entity (
                                 user_id          BIGINT UNSIGNED PRIMARY KEY,
                                 grade_id         VARCHAR(20) NOT NULL,
                                 class_id         VARCHAR(20) NOT NULL,
                                 language_id      VARCHAR(10) NOT NULL,
-                                is_international BOOLEAN NOT NULL DEFAULT FALSE,
-                                status ENUM('enrolled','leave','dropped') NOT NULL DEFAULT 'enrolled',
+                                is_international VARCHAR(10) NOT NULL DEFAULT FALSE,
+                                status ENUM('enrolled','leave','dropped', 'graduated') NOT NULL DEFAULT 'enrolled',
                                 KEY ix_student_grade (grade_id),
                                 KEY ix_student_class (class_id),
                                 KEY ix_student_language (language_id),
@@ -112,29 +120,19 @@ CREATE TABLE course (
 
 CREATE TABLE course_schedule (
                                  schedule_id  VARCHAR(10) PRIMARY KEY,
-                                 classroom_id VARCHAR(6) NOT NULL,
-                                 time_slot_id VARCHAR(6) NOT NULL,
+                                 classroom_id VARCHAR(6)  NOT NULL,
+                                 time_slot_id VARCHAR(6)  NOT NULL,
                                  course_id    VARCHAR(15) NOT NULL,
-                                 sec_id       VARCHAR(8) NOT NULL,
-                                 day_of_week  ENUM('MON','TUE','WED','THU','FRI'),
+                                 sec_id       VARCHAR(8)  NOT NULL,
+                                 day_of_week  ENUM('MON','TUE','WED','THU','FRI') NOT NULL,
+    -- 한 강의실/시간/요일에는 하나의 수업만
                                  UNIQUE KEY ux_sched_slot_room (time_slot_id, classroom_id, day_of_week),
-                                 KEY ix_sched_course_slot (sec_id, course_id, time_slot_id),CREATE TABLE course_schedule (
-                                 schedule_id  VARCHAR(10) PRIMARY KEY,
-                                 classroom_id VARCHAR(6) NOT NULL,
-                                 time_slot_id VARCHAR(6) NOT NULL,
-                                 course_id    VARCHAR(15) NOT NULL,
-                                 sec_id       VARCHAR(8) NOT NULL,
-                                 day_of_week  ENUM('MON','TUE','WED','THU','FRI'),
-                                 UNIQUE KEY ux_sched_slot_room (time_slot_id, classroom_id),
-                                 KEY ix_sched_course_slot (sec_id, course_id, time_slot_id),
+                                 KEY ix_sched_course_slot (sec_id, course_id, time_slot_id, day_of_week),
+                                 KEY ix_sched_room_day (classroom_id, day_of_week),
                                  CONSTRAINT fk_sched_classroom FOREIGN KEY (classroom_id) REFERENCES classroom(classroom_id),
-                                 CONSTRAINT fk_sched_timeslot FOREIGN KEY (time_slot_id) REFERENCES time_slot(time_slot_id),
-                                 CONSTRAINT fk_sched_course FOREIGN KEY (course_id) REFERENCES course(course_id),
-                                 CONSTRAINT fk_sched_section FOREIGN KEY (sec_id) REFERENCES section(sec_id)
-                                 CONSTRAINT fk_sched_classroom FOREIGN KEY (classroom_id) REFERENCES classroom(classroom_id),
-                                 CONSTRAINT fk_sched_timeslot FOREIGN KEY (time_slot_id) REFERENCES time_slot(time_slot_id),
-                                 CONSTRAINT fk_sched_course FOREIGN KEY (course_id) REFERENCES course(course_id),
-                                 CONSTRAINT fk_sched_section FOREIGN KEY (sec_id) REFERENCES section(sec_id)
+                                 CONSTRAINT fk_sched_timeslot  FOREIGN KEY (time_slot_id) REFERENCES time_slot(time_slot_id),
+                                 CONSTRAINT fk_sched_course    FOREIGN KEY (course_id) REFERENCES course(course_id),
+                                 CONSTRAINT fk_sched_section   FOREIGN KEY (sec_id) REFERENCES section(sec_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE course_target (

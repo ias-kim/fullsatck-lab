@@ -15,23 +15,6 @@ FROM notice n
     -- 타겟이 지정되지 않은 전체 공지일 수도 있으므로 LEFT JOIN
          LEFT JOIN notice_target nt ON nt.notice_id = n.notice_id;
 
-CREATE OR REPLACE VIEW v_notice_list AS
-SELECT
-    n.notice_id,
-    n.title,
-    n.created_at,
-    c.course_id,
-    c.title AS course_title,
-    -- 이 공지의 타겟 정보
-    nt.grade_id    AS target_grade_id,
-    nt.level_id    AS target_level_id,
-    nt.language_id AS target_language_id
-FROM notice n
-         -- 과목 공지가 아닐 수도 있으므로 LEFT JOIN
-         LEFT JOIN course c ON c.course_id = n.course_id
-    -- 타겟이 지정되지 않은 전체 공지일 수도 있으므로 LEFT JOIN
-         LEFT JOIN notice_target nt ON nt.notice_id = n.notice_id;
-
 -- 교수가 로그인했을 때
 SELECT *
 FROM v_notice_list
