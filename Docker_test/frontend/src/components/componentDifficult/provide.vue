@@ -11,4 +11,3 @@ const value = inject('key', () => new ExpensiveClass(), true);
 <template></template>
 
 <style scoped></style>
-. 0

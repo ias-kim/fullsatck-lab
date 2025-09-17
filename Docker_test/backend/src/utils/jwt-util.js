@@ -22,8 +22,9 @@ export const sign = (user) => {
   });
 };
 
-export const verify = (token) => {
+export const verify = (req) => {
   try {
+    const token = req.headers['authorization'];
     const decoded = jwt.verify(token, secret);
     return {
       ok: true,
@@ -51,8 +52,8 @@ export const refresh = () => {
 export const refreshVerify = async (token, userId) => {
   const getAsync = promisify(redisClient.get).bind(redisClient);
   try {
-    const data = await getAsync(`session:${userId}`);
-    if (data && token === data) {
+    const data = await getAsync(userId);
+    if (token === data) {
       try {
         jwt.verify(token, secret);
         return true;
