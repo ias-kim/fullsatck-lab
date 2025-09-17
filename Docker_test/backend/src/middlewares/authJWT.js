@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { refreshVerify, sign, verify } from '../utils/jwt-util.js';
 import dotenv from 'dotenv'; // { "Authorization": "Bearer jwt-token" } 형태로 담겨옴
 dotenv.config();
+
 const secret = process.env.JWT_SECRET;
 // { "Authorization": "Bearer jwt-token" } 형태로 담겨옴
 

@@ -4,22 +4,19 @@ import { createClient } from 'redis';
 dotenv.config();
 
 const redisClient = createClient({
+  username: process.env.REDIS_USERNAME,
+  password: process.env.REDIS_PASSWORD,
   socket: {
-    tls: true, // rediss:// 프로토콜 대신 tls 옵션을 사용
+    port: process.env.REDIS_PORT,
+    host: process.env.REDIS_HOST,
   },
-  url: process.env.REDIS_URL,
 });
 
 redisClient.on('connect', () => {
   console.log('Redis Connected');
 });
 redisClient.on('error', (err) => {
-  console.log(
-    'Redis Error',
-    err,
-    process.env.REDIS_HOST,
-    process.env.REDIS_PASSWORD,
-  );
+  console.log('Redis Error', err);
 });
 
 await redisClient.connect();
