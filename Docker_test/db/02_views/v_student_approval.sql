@@ -23,3 +23,7 @@ FROM user_account ua
          LEFT JOIN level l           ON lc.level_id = l.level_id
          LEFT JOIN language lang     ON se.language_id = lang.language_id
 WHERE ua.status='pending';
+
+ALTER TABLE user_role ADD UNIQUE KEY uk_user_role (user_id, role_type);
+ALTER TABLE user_account ADD KEY ix_ua_status (status);
+ALTER TABLE student_entity ADD KEY ix_se_user (user_id);

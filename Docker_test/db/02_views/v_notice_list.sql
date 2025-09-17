@@ -1,46 +1,41 @@
+-- 권장 제약 (과목당 교수 1명 보장)
+ALTER TABLE course_professor
+    ADD CONSTRAINT uk_cp_one_prof UNIQUE (course_id);
+
+-- 뷰: 교수 1명을 작성자로 사용
 CREATE OR REPLACE VIEW v_notice_list AS
 SELECT
+    c.sec_id,
     n.notice_id,
     n.title,
     n.created_at,
-    c.course_id,
-    c.title AS course_title,
-    -- 이 공지의 타겟 정보
-    nt.grade_id    AS target_grade_id,
-    nt.level_id    AS target_level_id,
-    nt.language_id AS target_language_id
+    n.course_id,
+    c.title                 AS course_title,
+    prof.user_id            AS author_id,    -- 담당 교수 = 작성자
+    prof.name               AS author_name,  -- 담당 교수명
+    ur.role_type            AS author_role,  -- 담당 교수의 권한(1인1역 가정)
+    COALESCE(t.targets, JSON_ARRAY()) AS targets
 FROM notice n
-         -- 과목 공지가 아닐 수도 있으므로 LEFT JOIN
-         LEFT JOIN course c ON c.course_id = n.course_id
-    -- 타겟이 지정되지 않은 전체 공지일 수도 있으므로 LEFT JOIN
-         LEFT JOIN notice_target nt ON nt.notice_id = n.notice_id;
-
--- 교수가 로그인했을 때
-SELECT *
-FROM v_notice_list
-ORDER BY created_at DESC;
-
--- 학생(예: user_id = @john)이 로그인했을 때
-SELECT
-    vn.notice_id,
-    vn.title,
-    vn.created_at,
-    vn.course_title
-FROM
-    v_notice_list vn
-        JOIN
-    student_entity se ON se.user_id = @john_id
--- 학생의 레벨(level) 정보를 얻기 위해 level_class JOIN
-        JOIN
-    level_class lc ON lc.class_id = se.class_id
-WHERE
-   -- 조건 1: 전체 공지 (타겟이 아예 지정 안 된 공지)
-    (vn.target_grade_id IS NULL AND vn.target_level_id IS NULL AND vn.target_language_id IS NULL)
-   -- 조건 2: 학생의 학년과 공지의 타겟 학년이 일치하는 경우
-   OR (vn.target_grade_id = se.grade_id)
-   -- 조건 3: 학생의 레벨과 공지의 타겟 레벨이 일치하는 경우
-   OR (vn.target_level_id = lc.level_id)
-   -- 조건 4: 학생의 언어와 공지의 타겟 언어가 일치하는 경우
-   OR (vn.target_language_id = se.language_id)
-ORDER BY
-    created_at DESC;
+         JOIN course c
+              ON c.course_id = n.course_id
+         JOIN course_professor cp
+              ON cp.course_id = c.course_id
+         JOIN user_account prof
+              ON prof.user_id = cp.user_id
+         LEFT JOIN (
+    SELECT user_id, MIN(role_type) AS role_type
+    FROM user_role
+    GROUP BY user_id
+) ur
+                   ON ur.user_id = prof.user_id
+         LEFT JOIN (
+    SELECT
+        nt.notice_id,
+        JSON_ARRAYAGG(
+                JSON_OBJECT('grade_id', nt.grade_id, 'level_id', nt.level_id, 'language_id', nt.language_id)
+        ) AS targets
+    FROM notice_target nt
+    GROUP BY nt.notice_id
+) t
+                   ON t.notice_id = n.notice_id
+ORDER BY n.created_at DESC;

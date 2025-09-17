@@ -1,328 +1,349 @@
-ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY 'root';
-FLUSH PRIVILEGES;
+-- =========================================================
+-- GSC Portal Database Schema
+-- =========================================================
 
-CREATE DATABASE IF NOT EXISTS gsc CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE DATABASE IF NOT EXISTS gsc_portal
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
 
+USE gsc_portal;
 
-USE gsc;
+-- =========================================================
+-- 01. Users & Roles
+-- =========================================================
+CREATE TABLE grade (
+                       grade_id   VARCHAR(20) PRIMARY KEY,
+                       name       VARCHAR(50) NOT NULL UNIQUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
-/**
-  기준 정보 테이블 생성
- */
-
--- 2. 학년 테이블
-CREATE TABLE grades (
-    grade_id CHAR(5) PRIMARY KEY,
-    name VARCHAR(20) NOT NULL
-);
-
--- 3. 레벨 테이블
 CREATE TABLE level (
-    level_id CHAR(5) PRIMARY KEY,
-    name VARCHAR(20) NOT NULL
-);
+                       level_id   VARCHAR(20) PRIMARY KEY,
+                       name       VARCHAR(50) NOT NULL UNIQUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 4. 국적 테이블
-CREATE TABLE nationality (
-    nationality_id CHAR(5) PRIMARY KEY,
-    name VARCHAR(20) NOT NULL
-);
-
--- 5. 레벨 클래스 (반) 테이블
 CREATE TABLE level_class (
-    class_id CHAR(5) PRIMARY KEY,
-    level_id CHAR(5) NOT NULL,
-    name VARCHAR(20) NOT NULL,
-    FOREIGN KEY (level_id) REFERENCES level(level_id)
-);
+                             class_id   VARCHAR(20) PRIMARY KEY,
+                             level_id   VARCHAR(20) NOT NULL,
+                             name       VARCHAR(50) NOT NULL,
+                             CONSTRAINT fk_level_class FOREIGN KEY (level_id) REFERENCES level(level_id),
+                             UNIQUE KEY ux_level_class_level_name (level_id, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/**
-  사용자 및 권한 관련 테이블
- */
+CREATE TABLE language (
+                          language_id VARCHAR(10) PRIMARY KEY,
+                          name        VARCHAR(20) NOT NULL UNIQUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 1. 공통 사용자 정보
 CREATE TABLE user_account (
-    user_id CHAR(10) PRIMARY KEY,
-    google_id VARCHAR(255) UNIQUE,
-    name VARCHAR(50) NOT NULL,
-    email VARCHAR(100) NOT NULL UNIQUE,
-    phone VARCHAR(20) UNIQUE,
-    status ENUM('ACTIVE', 'INACTIVE') DEFAULT 'INACTIVE',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+                              user_id       BIGINT UNSIGNED PRIMARY KEY,
+                              name          VARCHAR(100) NOT NULL,
+                              email         VARCHAR(200),
+                              phone         VARCHAR(50),
+                              role_type ENUM('student', 'professor', 'admin') NOT NULL DEFAULT 'student',
+                              status        ENUM('active','inactive','pending') NOT NULL DEFAULT 'pending',
+                              refresh_token VARCHAR(255),
+                              updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                              UNIQUE KEY ux_user_email (email),
+                              UNIQUE KEY ux_user_phone (phone)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 2. 사용자 역할
 CREATE TABLE user_role (
-    role_type ENUM('STUDENT', 'PROFESSOR', 'ADMIN') NOT NULL,
-    user_id CHAR(10),
-    PRIMARY KEY (role_type, user_id),
-    FOREIGN KEY (user_id) REFERENCES user_account(user_id) ON DELETE CASCADE
-);
+                           user_id   BIGINT UNSIGNED NOT NULL,
+                           role_type ENUM('student','professor','admin') NOT NULL,
+                           PRIMARY KEY (user_id, role_type),
+                           KEY ix_user_role_type (role_type),
+                           CONSTRAINT fk_user_role_user FOREIGN KEY (user_id) REFERENCES user_account(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 3. 학생 정보
 CREATE TABLE student_entity (
-    user_id VARCHAR(10) PRIMARY KEY,
-    grade_id CHAR(5),
-    class_id CHAR(5),
-    nationality_id CHAR(5),
-    FOREIGN KEY (user_id) REFERENCES user_account(user_id),
-    FOREIGN KEY (grade_id) REFERENCES grades(grade_id),
-    FOREIGN KEY (class_id) REFERENCES level_class(class_id),
-    FOREIGN KEY (nationality_id) REFERENCES nationality(nationality_id)
-);
+                                user_id          BIGINT UNSIGNED PRIMARY KEY,
+                                grade_id         VARCHAR(20) NOT NULL,
+                                class_id         VARCHAR(20) NOT NULL,
+                                language_id      VARCHAR(10) NOT NULL,
+                                is_international VARCHAR(10) NOT NULL DEFAULT FALSE,
+                                status ENUM('enrolled','leave','dropped', 'graduated') NOT NULL DEFAULT 'enrolled',
+                                KEY ix_student_grade (grade_id),
+                                KEY ix_student_class (class_id),
+                                KEY ix_student_language (language_id),
+                                CONSTRAINT fk_student_user     FOREIGN KEY (user_id) REFERENCES user_account(user_id) ON DELETE CASCADE,
+                                CONSTRAINT fk_student_grade    FOREIGN KEY (grade_id) REFERENCES grade(grade_id),
+                                CONSTRAINT fk_student_class    FOREIGN KEY (class_id) REFERENCES level_class(class_id),
+                                CONSTRAINT fk_student_language FOREIGN KEY (language_id) REFERENCES language(language_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 4. 교수 정보
-CREATE TABLE professor_entity (
-    user_id CHAR(10) PRIMARY KEY,
-    FOREIGN KEY (user_id) REFERENCES user_account(user_id)
-);
+-- =========================================================
+-- 02. Messaging (Kakao)
+-- =========================================================
+CREATE TABLE kakao_user (
+                            user_id     BIGINT UNSIGNED PRIMARY KEY,
+                            kakao_id    VARCHAR(128) NOT NULL UNIQUE,
+                            linked_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+                            CONSTRAINT fk_kakao_user FOREIGN KEY (user_id) REFERENCES user_account(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 5. 관리자 정보
-CREATE TABLE admin_entity (
-    user_id CHAR(10) PRIMARY KEY,
-    FOREIGN KEY (user_id) REFERENCES user_account(user_id)
-);
-
-/**
-  강의 관련 테이블
- */
-
--- 1. section - 학기 단위 정보
+-- =========================================================
+-- 03. Academic Structure
+-- =========================================================
 CREATE TABLE section (
-    sec_id CHAR(8) PRIMARY KEY,
-    year YEAR NOT NULL,
-    semester ENUM('1', '2', 'S', 'W') NOT NULL COMMENT '1: 1학기, 2: 2학기, S: 여름학기, W: 겨울학기'
-);
+                         sec_id     VARCHAR(8) PRIMARY KEY,
+                         semester   TINYINT NOT NULL,
+                         year       YEAR NOT NULL,
+                         start_date DATE,
+                         end_date   DATE,
+                         UNIQUE KEY ux_section_year_sem (year, semester)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 2. course 강의 정보
-CREATE TABLE course (
-    course_id CHAR(10) PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
-    is_special BOOLEAN DEFAULT FALSE,
-    sec_id CHAR(8) NOT NULL,
-    user_id CHAR(10),
-    FOREIGN KEY (sec_id) REFERENCES section(sec_id),
-    FOREIGN KEY (user_id) REFERENCES professor_entity(user_id)
-);
-
--- 3. course_target 강의 대상 필터 (학년/레벨 하나만 존재)
-CREATE TABLE course_target (
-    target_id CHAR(10) PRIMARY KEY,
-    course_id CHAR(10) NOT NULL,
-    grade_id CHAR(5),
-    level_id CHAR(5),
-    nationality_id CHAR(5),
-    FOREIGN KEY (course_id) REFERENCES course(course_id),
-    FOREIGN KEY (grade_id) REFERENCES grades(grade_id),
-    FOREIGN KEY (level_id) REFERENCES level(level_id),
-    FOREIGN KEY (nationality_id) REFERENCES nationality(nationality_id)
-);
-
--- 4. course_nationality 강의 수강 가능한 국적 (다대다)
-CREATE TABLE course_nationality (
-    course_id CHAR(10) NOT NULL,
-    nationality_id CHAR(5) NOT NULL,
-    PRIMARY KEY (course_id, nationality_id),
-    FOREIGN KEY (course_id) REFERENCES course(course_id),
-    FOREIGN KEY (nationality_id) REFERENCES nationality(nationality_id)
-);
-
-/**
-    시간표 및 이벤트 관련 테이블
- */
-
--- 1. 시간 정보
 CREATE TABLE time_slot (
-    time_slot_id CHAR(6) PRIMARY KEY,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL
-);
+                           time_slot_id VARCHAR(6) PRIMARY KEY,
+                           start_time   TIME NOT NULL,
+                           end_time     TIME NOT NULL,
+                           UNIQUE KEY ux_slot_day_time (start_time, end_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 2. 강의실 정보
 CREATE TABLE classroom (
-    classroom_id CHAR(6) PRIMARY KEY,
-    building VARCHAR(50) NOT NULL,
-    room_number VARCHAR(10) NOT NULL
-);
+                           classroom_id VARCHAR(6) PRIMARY KEY,
+                           building     VARCHAR(50) NOT NULL,
+                           room_number  VARCHAR(10) NOT NULL,
+                           room_type    ENUM('CLASSROOM','LAB') NOT NULL DEFAULT 'CLASSROOM',
+                           UNIQUE KEY ux_room_building_no (building, room_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 3. 시간표 정보
-CREATE TABLE timetable (
-    schedule_id CHAR(10) PRIMARY KEY,
-    course_id CHAR(10) NOT NULL,
-    day ENUM('MON', 'TUE', 'WED', 'THU', 'FRI') NOT NULL,
-    time_slot_id CHAR(6) NOT NULL,
-    classroom_id CHAR(6) NOT NULL,
-    FOREIGN KEY (course_id) REFERENCES course(course_id),
-    FOREIGN KEY (time_slot_id) REFERENCES time_slot(time_slot_id),
-    FOREIGN KEY (classroom_id) REFERENCES classroom(classroom_id)
-);
+CREATE TABLE course (
+                        course_id  VARCHAR(15) PRIMARY KEY,
+                        sec_id     VARCHAR(8) NOT NULL,
+                        title      VARCHAR(100) NOT NULL,
+                        is_special BOOLEAN NOT NULL DEFAULT FALSE,
+                        KEY ix_course_sec_title (sec_id, title),
+                        CONSTRAINT fk_course_sec FOREIGN KEY (sec_id) REFERENCES section(sec_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 4. course_event 특강 / 보강 / 휴강
-CREATE TABLE course_event (
-    event_id CHAR(10) PRIMARY KEY,
-    course_id CHAR(10) NOT NULL,
-    event_type ENUM('makeup', 'CANCEL', 'SPECIAL') NOT NULL,
-    event_date DATE NOT NULL,
-    time_slot_id CHAR(6),
-    classroom_id CHAR(6),
-    FOREIGN KEY (course_id) REFERENCES course(course_id),
-    FOREIGN KEY (time_slot_id) REFERENCES time_slot(time_slot_id),
-    FOREIGN KEY (classroom_id) REFERENCES classroom(classroom_id)
-);
+CREATE TABLE course_schedule (
+                                 schedule_id  VARCHAR(10) PRIMARY KEY,
+                                 classroom_id VARCHAR(6)  NOT NULL,
+                                 time_slot_id VARCHAR(6)  NOT NULL,
+                                 course_id    VARCHAR(15) NOT NULL,
+                                 sec_id       VARCHAR(8)  NOT NULL,
+                                 day_of_week  ENUM('MON','TUE','WED','THU','FRI') NOT NULL,
+    -- 한 강의실/시간/요일에는 하나의 수업만
+                                 UNIQUE KEY ux_sched_slot_room (time_slot_id, classroom_id, day_of_week),
+                                 KEY ix_sched_course_slot (sec_id, course_id, time_slot_id, day_of_week),
+                                 KEY ix_sched_room_day (classroom_id, day_of_week),
+                                 CONSTRAINT fk_sched_classroom FOREIGN KEY (classroom_id) REFERENCES classroom(classroom_id),
+                                 CONSTRAINT fk_sched_timeslot  FOREIGN KEY (time_slot_id) REFERENCES time_slot(time_slot_id),
+                                 CONSTRAINT fk_sched_course    FOREIGN KEY (course_id) REFERENCES course(course_id),
+                                 CONSTRAINT fk_sched_section   FOREIGN KEY (sec_id) REFERENCES section(sec_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/**
-  공지사항 관련 테이블
- */
--- 1. 공지사항
+CREATE TABLE course_target (
+                               target_id   VARCHAR(10) PRIMARY KEY,
+                               course_id   VARCHAR(15) NOT NULL,
+                               grade_id    VARCHAR(20),
+                               level_id    VARCHAR(20),
+                               language_id VARCHAR(10),
+                               UNIQUE KEY ux_course_target_combo (course_id, grade_id, level_id, language_id),
+                               CONSTRAINT fk_ct_course FOREIGN KEY (course_id) REFERENCES course(course_id),
+                               CONSTRAINT fk_ct_grade  FOREIGN KEY (grade_id) REFERENCES grade(grade_id),
+                               CONSTRAINT fk_ct_level  FOREIGN KEY (level_id) REFERENCES level(level_id),
+                               CONSTRAINT fk_ct_lang   FOREIGN KEY (language_id) REFERENCES language(language_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE course_language (
+                                 course_id   VARCHAR(15) NOT NULL,
+                                 language_id VARCHAR(10) NOT NULL,
+                                 PRIMARY KEY (course_id, language_id),
+                                 CONSTRAINT fk_cl_course FOREIGN KEY (course_id) REFERENCES course(course_id),
+                                 CONSTRAINT fk_cl_lang   FOREIGN KEY (language_id) REFERENCES language(language_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================
+-- 04. Notice & Event & Files
+-- =========================================================
+CREATE TABLE file_assets (
+                             file_id    CHAR(10) PRIMARY KEY,
+                             file_name  VARCHAR(255) NOT NULL,
+                             file_url   TEXT NOT NULL,
+                             size_type  INT,
+                             file_type  ENUM('PDF','IMG') NOT NULL,
+                             uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE notice (
-    notice_id CHAR(5) PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
-    content TEXT NOT NULL,
-    course_id CHAR(10) NULL,
-    user_id CHAR(10) NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP,
-    send_line BOOLEAN DEFAULT FALSE,
-    send_calendar BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (course_id) REFERENCES course(course_id),
-    FOREIGN KEY (user_id) REFERENCES user_account(user_id)
-);
+                        notice_id  INT PRIMARY KEY AUTO_INCREMENT,
+                        user_id BIGINT not null,
+                        course_id  VARCHAR(15),
+                        title      VARCHAR(100) NOT NULL,
+                        content    TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        KEY ix_notice_course_time (course_id, created_at),
+                        CONSTRAINT fk_notice_course FOREIGN KEY (course_id) REFERENCES course(course_id),
+                        CONSTRAINT fk_notice_user FOREIGN KEY (user_id) REFERENCES user_account(user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 첨부파일
-CREATE TABLE notice_attachments (
-    attachment_id CHAR(10) PRIMARY KEY,
-    notice_id CHAR(10) NOT NULL,
-    file_name VARCHAR(255) NOT NULL,
-    file_url TEXT NOT NULL,
-    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (notice_id) REFERENCES notice(notice_id)
-);
+CREATE TABLE notice_file (
+                             file_id   CHAR(10) NOT NULL,
+                             notice_id INT NOT NULL,
+                             PRIMARY KEY (notice_id, file_id),
+                             CONSTRAINT fk_nf_file FOREIGN KEY (file_id) REFERENCES file_assets(file_id),
+                             CONSTRAINT fk_nf_notice FOREIGN KEY (notice_id) REFERENCES notice(notice_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- notice_target - 공지 대상 지정
 CREATE TABLE notice_target (
-    notice_target_id CHAR(10) PRIMARY KEY,
-    notice_id CHAR(10) NOT NULL,
-    grade_id CHAR(5),
-    level_id CHAR(5),
-    nationality_id CHAR(5),
-    FOREIGN KEY (notice_id) REFERENCES notice(notice_id),
-    FOREIGN KEY (grade_id) REFERENCES grades(grade_id),
-    FOREIGN KEY (level_id) REFERENCES level(level_id),
-    FOREIGN KEY (nationality_id) REFERENCES nationality(nationality_id)
-);
+                               target_id   CHAR(10) PRIMARY KEY,
+                               notice_id   INT NOT NULL,
+                               grade_id    VARCHAR(20),
+                               level_id    VARCHAR(20),
+                               language_id VARCHAR(10),
+                               UNIQUE KEY ux_notice_target_combo (notice_id, grade_id, level_id, language_id),
+                               CONSTRAINT fk_nt_notice FOREIGN KEY (notice_id) REFERENCES notice(notice_id),
+                               CONSTRAINT fk_nt_grade  FOREIGN KEY (grade_id) REFERENCES grade(grade_id),
+                               CONSTRAINT fk_nt_level  FOREIGN KEY (level_id) REFERENCES level(level_id),
+                               CONSTRAINT fk_nt_lang   FOREIGN KEY (language_id) REFERENCES language(language_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- notice_line 라인 전송 전송
-CREATE TABLE notice_line (
-    notice_id CHAR(10),
-    user_id CHAR(10),
-    sent_at DATETIME,
-    PRIMARY KEY (notice_id, user_id),
-    FOREIGN KEY (notice_id) REFERENCES notice(notice_id),
-    FOREIGN KEY (user_id) REFERENCES student_entity(user_id)
-);
+CREATE TABLE notification_delivery_notice (
+                                              delivery_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                                              user_id     BIGINT UNSIGNED NOT NULL,
+                                              notice_id   INT NOT NULL,
+                                              message_id  VARCHAR(64) NOT NULL,
+                                              send_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                              read_at     DATETIME,
+                                              status      ENUM('QUEUED','SENT','FAILED') NOT NULL DEFAULT 'QUEUED',
+                                              UNIQUE KEY ux_ndn_notice_user (notice_id, user_id),
+                                              UNIQUE KEY ux_ndn_message (message_id),
+                                              KEY ix_ndn_inbox (user_id, status, read_at),
+                                              CONSTRAINT fk_ndn_user   FOREIGN KEY (user_id) REFERENCES user_account(user_id),
+                                              CONSTRAINT fk_ndn_notice FOREIGN KEY (notice_id) REFERENCES notice(notice_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ? notice calendar
-CREATE TABLE notice_calendar (
-    notice_id CHAR(10) PRIMARY KEY,
-    google_event_id VARCHAR(255),
-    html_link TEXT,
-    FOREIGN KEY (notice_id) REFERENCES notice(notice_id)
-);
+CREATE TABLE course_event (
+                              event_id    CHAR(10) PRIMARY KEY,
+                              schedule_id VARCHAR(10) NOT NULL,
+                              event_type  ENUM('CANCEL','MAKEUP') NOT NULL,
+                              event_date  DATE NOT NULL,
+                              UNIQUE KEY ux_event_sched_date_type (schedule_id, event_date, event_type),
+                              KEY ix_event_date (event_date),
+                              CONSTRAINT fk_event_sched FOREIGN KEY (schedule_id) REFERENCES course_schedule(schedule_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/**
-  라인 인증 및 연동 관련 테이블
- */
+CREATE TABLE notification_delivery_event (
+                                             delivery_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                                             user_id     BIGINT UNSIGNED NOT NULL,
+                                             event_id    CHAR(10) NOT NULL,
+                                             message_id  VARCHAR(64) NOT NULL,
+                                             send_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                             read_at     DATETIME,
+                                             status      ENUM('QUEUED','SENT','FAILED') NOT NULL DEFAULT 'QUEUED',
+                                             UNIQUE KEY ux_nde_event_user (event_id, user_id),
+                                             UNIQUE KEY ux_nde_message (message_id),
+                                             KEY ix_nde_inbox (user_id, status, read_at),
+                                             CONSTRAINT fk_nde_user  FOREIGN KEY (user_id) REFERENCES user_account(user_id),
+                                             CONSTRAINT fk_nde_event FOREIGN KEY (event_id) REFERENCES course_event(event_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
- -- 라인 인증 요청 토큰 저장
- CREATE TABLE line_auth_token (
-     token CHAR(6) PRIMARY KEY,
-     user_id CHAR(10) NOT NULL,
-     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-     is_verified BOOLEAN DEFAULT FALSE,
-     FOREIGN KEY (user_id) REFERENCES student_entity(user_id)
- );
+CREATE TABLE log_entity (
+                            log_id    BIGINT PRIMARY KEY AUTO_INCREMENT,
+                            user_id   BIGINT UNSIGNED NOT NULL,
+                            action    ENUM('LOGIN','READ_NOTICE','READ_EVENT','RESERVE','VOTE') NOT NULL,
+                            event_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            KEY ix_log_user_time (user_id, action, event_time),
+                            CONSTRAINT fk_log_user FOREIGN KEY (user_id) REFERENCES user_account(user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
- -- line-entity 사용자 정보 연동
-CREATE TABLE line_entity (
-    user_id CHAR(10) PRIMARY KEY,
-    line_id VARCHAR(50) UNIQUE NOT NULL, -- LINE UID (UXXXXXX) 형태
-    linked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    receive_line_message BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (user_id) REFERENCES student_entity(user_id)
-);
+CREATE TABLE allowed_email (
+                               id     INT PRIMARY KEY AUTO_INCREMENT,
+                               email  VARCHAR(200) NOT NULL UNIQUE,
+                               reason VARCHAR(100),
+                               tag    VARCHAR(50)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 학생 과목 연결
-CREATE TABLE student_course (
-    course_id CHAR(10) NOT NULL,
-    user_id CHAR(10) NOT NULL,
-    course_by_line TEXT,
-    PRIMARY KEY (course_id, user_id),
-    FOREIGN KEY (course_id) REFERENCES course(course_id),
-    FOREIGN KEY (user_id) REFERENCES student_entity(user_id)
-);
+CREATE TABLE student_exams (
+                               exam_id   CHAR(10) PRIMARY KEY,
+                               user_id   BIGINT UNSIGNED NOT NULL,
+                               file_id   CHAR(10),
+                               level_id  VARCHAR(20),
+                               exam_type ENUM('JLPT','TOPIK'),
+                               score     INT,
+                               UNIQUE KEY ux_exam_user_type_level (user_id, exam_type, level_id),
+                               CONSTRAINT fk_exam_user FOREIGN KEY (user_id) REFERENCES user_account(user_id),
+                               CONSTRAINT fk_exam_file FOREIGN KEY (file_id) REFERENCES file_assets(file_id),
+                               CONSTRAINT fk_exam_level FOREIGN KEY (level_id) REFERENCES level(level_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 교수 과목 연결
 CREATE TABLE course_professor (
-    user_id CHAR(10) NOT NULL,
-    course_id CHAR(10) NOT NULL,
-    course_by_line TEXT,
-    PRIMARY KEY (user_id, course_id),
-    FOREIGN KEY (user_id) REFERENCES professor_entity(user_id),
-    FOREIGN KEY (course_id) REFERENCES course(course_id)
-);
+                                  user_id   BIGINT UNSIGNED NOT NULL,
+                                  course_id VARCHAR(15) NOT NULL,
+                                  PRIMARY KEY (user_id, course_id),
+                                  CONSTRAINT fk_cp_user   FOREIGN KEY (user_id) REFERENCES user_account(user_id),
+                                  CONSTRAINT fk_cp_course FOREIGN KEY (course_id) REFERENCES course(course_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/**
-  인증 / 사용자 관련 인덱스
- */
-CREATE INDEX idx_user_status ON user_account(status);
+CREATE TABLE course_student (
+                                user_id   BIGINT UNSIGNED NOT NULL,
+                                course_id VARCHAR(15) NOT NULL,
+                                PRIMARY KEY (user_id, course_id),
+                                CONSTRAINT fk_cs_user   FOREIGN KEY (user_id) REFERENCES user_account(user_id),
+                                CONSTRAINT fk_cs_course FOREIGN KEY (course_id) REFERENCES course(course_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 권한
-CREATE INDEX idx_user_role_user_id ON user_role(user_id);
+-- =========================================================
+-- 05. Reservations
+-- =========================================================
+CREATE TABLE reservation (
+                             reservation_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                             user_id        BIGINT UNSIGNED NOT NULL,
+                             classroom_id   VARCHAR(6) NOT NULL,
+                             title          VARCHAR(100),
+                             start_at       DATETIME NOT NULL,
+                             end_at         DATETIME NOT NULL,
+                             status         ENUM('ACTIVE','CANCELLED','FINISHED') NOT NULL DEFAULT 'ACTIVE',
+                             created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+                             KEY ux_start (classroom_id, start_at),
+                             KEY ux_end   (classroom_id, end_at),
+                             CONSTRAINT fk_resv_user FOREIGN KEY (user_id) REFERENCES user_account(user_id),
+                             CONSTRAINT fk_resv_room FOREIGN KEY (classroom_id) REFERENCES classroom(classroom_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/**
-  공지사항 인덱스
- */
-CREATE INDEX idx_notice_course_id ON notice(course_id);
-CREATE INDEX idx_notice_user_id ON notice(user_id);
-CREATE INDEX idx_notice_created_at ON notice(created_at);
+CREATE TABLE weekend_attendance_poll (
+                                         poll_id       CHAR(10) PRIMARY KEY,
+                                         grade_id      VARCHAR(20),
+                                         classroom_id  VARCHAR(6) NOT NULL,
+                                         poll_date     DATE NOT NULL,
+                                         target_weekend ENUM('SAT','SUN'),
+                                         required_count INT NOT NULL DEFAULT 8,
+                                         status        BOOLEAN NOT NULL DEFAULT FALSE,
+                                         created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                         UNIQUE KEY ux_poll_room_date_day (classroom_id, poll_date, target_weekend),
+                                         CONSTRAINT fk_poll_grade FOREIGN KEY (grade_id) REFERENCES grade(grade_id),
+                                         CONSTRAINT fk_poll_room  FOREIGN KEY (classroom_id) REFERENCES classroom(classroom_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 타겟
-CREATE INDEX idx_notice_target_notice_id ON notice_target(notice_id);
-CREATE INDEX idx_notice_target_grade ON notice_target(grade_id);
-CREATE INDEX idx_notice_target_level ON notice_target(level_id);
-CREATE INDEX idx_notice_target_nationality ON notice_target(nationality_id);
+CREATE TABLE weekend_attendance_votes (
+                                          votes_id  BIGINT PRIMARY KEY AUTO_INCREMENT,
+                                          user_id   BIGINT UNSIGNED NOT NULL,
+                                          poll_id   CHAR(10) NOT NULL,
+                                          will_join BOOLEAN NOT NULL,
+                                          voted_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                          UNIQUE KEY ux_poll_user_once (poll_id, user_id),
+                                          CONSTRAINT fk_vote_user FOREIGN KEY (user_id) REFERENCES user_account(user_id),
+                                          CONSTRAINT fk_vote_poll FOREIGN KEY (poll_id) REFERENCES weekend_attendance_poll(poll_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 파일 첨부
-CREATE INDEX idx_notice_att_notice_id ON notice_attachments(notice_id);
-
-/**
-  시간표 관련 인덱스
- */
-CREATE INDEX idx_timetable_course_id ON timetable(course_id);
-CREATE INDEX idx_timetable_day ON timetable(day);
-
-CREATE INDEX idx_course_event_date ON course_event(event_date);
-CREATE INDEX idx_course_event_type ON course_event(event_type);
-
-/**
-  강의 수업 관련
- */
-CREATE INDEX idx_course_sec_id ON course(sec_id);
-CREATE INDEX idx_course_professor_id ON course(user_id);
-CREATE INDEX idx_course_is_special ON course(is_special);
-
--- 타겟
-CREATE INDEX idx_course_target_course_id ON course_target(course_id);
-
-/**
-  학생/교수/관리자 연결 관련 인덱스
- */
-CREATE INDEX idx_student_user_id ON student_entity(user_id);
-CREATE INDEX idx_student_grade_id ON student_entity(grade_id);
-
-CREATE INDEX idx_cp_course_id ON course_professor(course_id);
-CREATE INDEX idx_cp_professor_id ON course_professor(user_id);
-
-CREATE INDEX idx_sc_student_id ON student_course(user_id);
-CREATE INDEX idx_sc_course_id ON student_course(course_id);
+-- =========================================================
+-- 06. Cleaning
+-- =========================================================
+CREATE TABLE cleaning_assignment (
+                                     assignment_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                                     grade_id      VARCHAR(20) NOT NULL,
+                                     classroom_id  VARCHAR(6) NOT NULL,
+                                     work_date     DATE NOT NULL,
+                                     team_size     TINYINT NOT NULL DEFAULT 4,
+                                     members_json  JSON,
+                                     status        ENUM('SCHEDULED','DONE','MISSED','CANCELLED') NOT NULL DEFAULT 'SCHEDULED',
+                                     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                     confirmed_at  DATETIME,
+                                     UNIQUE KEY ux_cleaning_scope_day (grade_id, classroom_id, work_date),
+                                     KEY ix_cleaning_date (work_date),
+                                     CONSTRAINT fk_clean_grade FOREIGN KEY (grade_id) REFERENCES grade(grade_id),
+                                     CONSTRAINT fk_clean_room  FOREIGN KEY (classroom_id) REFERENCES classroom(classroom_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

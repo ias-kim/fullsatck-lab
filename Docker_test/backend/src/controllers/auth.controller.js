@@ -4,8 +4,8 @@ import https from 'https';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
 import redisClient from '../config/redis.js';
+import { createUser, findByEmail } from '../models/user.model.js';
 import { refresh, sign } from '../utils/jwt-util.js';
-import { createUser } from '../models/user.model.js';
 import axios from 'axios';
 
 dotenv.config();
@@ -67,34 +67,49 @@ async function authCallback(req, res) {
       // Google로부터 토큰 받기
       const { tokens } = await oauth2Client.getToken(q.code);
       console.log('받은 토큰', tokens);
-
-      const userInfoResponse = await axios.get(
-        `https://www.googleapis.com/oauth2/v2/userinfo`,
-        {
-          headers: {
-            Authorization: `Bearer ${tokens.access_token}`,
-          },
-        },
+      const { data: userInfo } = await axios.get(
+        'https://www.googleapis.com/oauth2/v2/userinfo',
+        { headers: { Authorization: `Bearer ${tokens.access_token}` } },
       );
-      const userInfo = userInfoResponse.data;
-      console.log('구글 사용자 정보', userInfo);
 
+      // 1) 사용자 조회/가입
+      let user = await findByEmail(userInfo.email);
+      if (!user) {
+        // 최초 로그인: INACTIVE로 가입만 시키고 끝
+        await createUser({
+          user_id: undefined, // auto
+          name: undefined,
+          email: userInfo.email,
+          status: 'INACTIVE',
+        });
+        console.log('이제 회원가입 완료');
+        return res.redirect('/signup/pending'); // "승인 대기" 페이지
+      }
+      // 잠시 오픈 마인드 주석
+      // if (user.status !== 'ACTIVE') {
+      //   // 가입은 되어있으나 아직 승인 안됨
+      //   console.log('승인대기');
+      //   return res.redirect('/signup/pending');
+      // }
+
+      const payload = {
+        user_id: user.user_id,
+        name: user.name,
+        email: user.email,
+        role: user.role ?? 'STUDENT',
+        status: user.status,
+      };
       // 사용자 정보와 Google refresh Token을 db에 저장/업데이트
       // 사용자 DB 처리: 없으면 insert, 있으면 조회
-      const userPayload = {
-        googleId: userInfo.id,
-        email: userInfo.email,
-        googleRefreshToken: tokens.refresh_token, // google refresh Token
-      };
-      console.log('값 확인', userPayload.googleId);
-      console.log('값 이메일', userPayload.email);
 
-      const result = await createUser(userPayload);
-      const userId = result.user_id;
+      console.log('값 이메일', payload.email);
+
+      // const result = await createUser(userPayload);
+      const userId = payload.user_id;
       console.log(userId);
       //  JWT 생성
-      const accessToken = sign(result); // 앱의 Access Token
-      const refreshToken = refresh(); // 앱의 Refresh Token
+      const accessToken = sign(payload); // 앱의 Access Token
+      const refreshToken = refresh(payload); // 앱의 Refresh Token
 
       // Refresh Token을 Redis에 저장
       await redisClient.set(`session:${userId}`, refreshToken, {
@@ -103,6 +118,7 @@ async function authCallback(req, res) {
 
       // 쿠키
       res.cookie('accessToken', accessToken, { httpOnly: true });
+      res.cookie('refreshToken', refreshToken, { httpOnly: true });
       res.redirect('/dashboard'); // spa frontend route
       if (
         tokens.scope.includes(

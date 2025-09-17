@@ -1,14 +1,14 @@
-import pool from '../config/db.js';
-import redisClient from '../config/redis.js';
-import jwtf from '../utils/jwt-util.js';
+const pool = require('../config/db.js');
+const jwt = require('jsonwebtoken');
+const redisClient = require('../config/redis.js');
 
-export const login = async (req, res) => {
+const login = async (req, res) => {
   // user 로직
 
   if (success) {
     // access token과 refresh token을 발급
-    const accessToken = jwtf.sign(user);
-    const refreshToken = jwtf.refresh();
+    const accessToken = jwt.sign(user);
+    const refreshToken = jwt.refresh();
 
     // 발급한 refresh token을 redis에 key를 user의 id로 하여 저장
     redisClient.set(user.id, refreshToken);
@@ -67,4 +67,4 @@ const deleteUser = (user_id) => {
   });
 };
 
-// module.exports = findByEmail;
+module.exports = findByEmail;

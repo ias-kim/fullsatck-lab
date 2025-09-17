@@ -170,12 +170,14 @@ CREATE TABLE file_assets (
 
 CREATE TABLE notice (
                         notice_id  INT PRIMARY KEY AUTO_INCREMENT,
+                        user_id BIGINT not null,
                         course_id  VARCHAR(15),
                         title      VARCHAR(100) NOT NULL,
                         content    TEXT NOT NULL,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         KEY ix_notice_course_time (course_id, created_at),
-                        CONSTRAINT fk_notice_course FOREIGN KEY (course_id) REFERENCES course(course_id)
+                        CONSTRAINT fk_notice_course FOREIGN KEY (course_id) REFERENCES course(course_id),
+                        CONSTRAINT fk_notice_user FOREIGN KEY (user_id) REFERENCES user_account(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE notice_file (
