@@ -56,7 +56,7 @@ export const createStudent = async ({
     );
 
     if (user.affectedRows !== 1) {
-      throw new Error('user_account(학생) 입력 실패 및');
+      throw new Error('user_account(학생) 입력 실패 ');
     }
 
     await conn.commit();

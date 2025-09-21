@@ -10,9 +10,6 @@ router.get('/', authController.googleAuthRedirect);
 // Google OAuth 2.0 서버에서 콜백을 수신합니다.
 router.get('/callback', authController.authCallback);
 
-// 토큰을 철회하는 예시
-router.get('/revoke', authController.authRevoke);
-
 router.get('/register', (req, res) => {
   res.render('register');
 });

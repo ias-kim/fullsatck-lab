@@ -1,4 +1,3 @@
-import { promisify } from 'util';
 import jwt from 'jsonwebtoken';
 import redisClient from '../config/redis.js';
 import dotenv from 'dotenv';
@@ -49,10 +48,8 @@ export const signRefresh = (userId, jti) => {
 };
 
 export const refreshVerify = async (token, userId) => {
-  const getAsync = promisify(redisClient.get).bind(redisClient);
   try {
     const allTokens = await redisClient.hVals(`session:${userId}`);
-    // const data = await getAsync(`session:${userId}`);
     if (allTokens && allTokens.includes(token)) {
       try {
         jwt.verify(token, secret);
@@ -64,7 +61,7 @@ export const refreshVerify = async (token, userId) => {
     }
     return false;
   } catch (err) {
-    console.warn('Redis ㅈ회 실패', err.message);
+    console.warn('Redis 조회 실패', err.message);
     return false;
   }
 };

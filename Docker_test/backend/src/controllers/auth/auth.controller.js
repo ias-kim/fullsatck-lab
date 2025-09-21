@@ -1,13 +1,17 @@
 import crypto from 'crypto';
 import url from 'url';
-import https from 'https';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
 import redisClient from '../../config/redis.js';
 import { findAuthEmail, findByEmail } from '../../models/auth.model.js';
 import { sign, signRefresh } from '../../utils/auth.utils.js';
+import { checkUserStatus, registerUser } from '../../services/auth.service.js';
+import {
+  BadRequestError,
+  ForbiddenError,
+  InternalServerError,
+} from '../../errors/index.js';
 import axios from 'axios';
-import { checkUserStatus, registerUser } from '../../services/user.service.js';
 import { v4 } from 'uuid';
 
 dotenv.config();
@@ -30,27 +34,33 @@ let userCredential = null;
 
 // 사용자를 Google OAuth 2.0 서버로 리디렉션
 async function googleAuthRedirect(req, res) {
-  // CSRF 방지를 위한 보안 상태 문자열 생성
-  const state = crypto.randomBytes(32).toString('hex');
-  // 세션에 상태 값을 저장
-  req.session.state = state;
+  try {
+    // CSRF 방지를 위한 보안 상태 문자열 생성
+    const state = crypto.randomBytes(32).toString('hex');
+    // 세션에 상태 값을 저장
+    req.session.state = state;
 
-  // 사용 권한을 요청하는 인증 URL 생성
-  const authorizationUrl = oauth2Client.generateAuthUrl({
-    // 'online' (기본값) 또는 'offline' (refresh_token 발급)
-    access_type: 'offline',
-    /** 위에 정의된 scopes 배열 전달.
-     * 하나의 권한만 필요하면 문자열로 전달 가능 */
-    scope: scopes,
-    // 점진적 권한 부여 활성화. 권장되는 모범 사례
-    include_granted_scopes: true,
-    // CSRF 공격 위험 감소를 위한 state 파라미터 포함
-    state,
-    // prompt: 'consent',
-  });
-  console.log('auth url', authorizationUrl);
+    // 사용 권한을 요청하는 인증 URL 생성
+    const authorizationUrl = oauth2Client.generateAuthUrl({
+      // 'online' (기본값) 또는 'offline' (refresh_token 발급)
+      access_type: 'offline',
+      /** 위에 정의된 scopes 배열 전달.
+       * 하나의 권한만 필요하면 문자열로 전달 가능 */
+      scope: scopes,
+      // 점진적 권한 부여 활성화. 권장되는 모범 사례
+      include_granted_scopes: true,
+      // CSRF 공격 위험 감소를 위한 state 파라미터 포함
+      state,
+      // prompt: 'consent',
+    });
+    console.log('auth url', authorizationUrl);
 
-  res.redirect(authorizationUrl);
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    throw new InternalServerError(
+      '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+    );
+  }
 }
 
 async function authCallback(req, res) {
@@ -59,16 +69,13 @@ async function authCallback(req, res) {
 
   if (q.error) {
     // 에러 응답 처리 (예: error=access_denied)
-    console.log('Error:' + q.error);
+    throw new BadRequestError('잘못된 요청입니다. 입력값을 확인하세요.');
   } else if (q.state !== req.session.state) {
-    // state 값 검증
-    console.log('State mismatch. Possible CSRF attack');
-    res.end('State mismatch. Possible CSRF attack');
+    throw new ForbiddenError('접근 권한이 없습니다. 관리자에게 문의하세요.');
   } else {
     try {
       // Google로부터 토큰 받기
       const { tokens } = await oauth2Client.getToken(q.code);
-      console.log('받은 토큰', tokens);
       const { data: userInfo } = await axios.get(
         'https://www.googleapis.com/oauth2/v2/userinfo',
         { headers: { Authorization: `Bearer ${tokens.access_token}` } },
@@ -78,7 +85,7 @@ async function authCallback(req, res) {
         let authUser = await findAuthEmail(userInfo.email);
 
         if (!authUser) {
-          console.log('유효한 이메일이 아닙니다.');
+          alert('유효한 이메일이 아닙니다.');
           return res.redirect('/');
         }
       }
@@ -99,9 +106,6 @@ async function authCallback(req, res) {
       // 비승인 접근 거절
       if (!verdict.success) {
         if (verdict.redirect) return res.redirect(verdict.redirect);
-        return res
-          .status(verdict.http)
-          .json({ success: false, message: verdict.message });
       }
 
       if (user) {
@@ -126,10 +130,6 @@ async function authCallback(req, res) {
         await redisClient.hSet(sessionKey, deviceId, refreshToken);
         await redisClient.expire(sessionKey, sevenDaysInSeconds);
 
-        // await redisClient.set(`session:${userId}`, refreshToken, {
-        //   EX: 7 * 24 * 60 * 60 * 1000, // 7일
-        // });
-
         // 쿠키에 토큰 설정 응답
         res.cookie('accessToken', accessToken, {
           httpOnly: true,
@@ -152,44 +152,12 @@ async function authCallback(req, res) {
         console.log('Calendar scope NOT granted');
       }
     } catch (error) {
-      console.error('OAuth Callbackk Error', error);
-      res.status(500).json({ message: '인증 처리 중 오류가 발생' });
+      console.error('OAuth Callback Error', error);
+      throw new InternalServerError(
+        '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      );
     }
   }
-}
-
-// 토큰 철회 함수
-async function authRevoke(req, res) {
-  // POST 요청을 위한 데이터 문자열 생성
-  let postData = 'token=' + userCredential.access_token;
-
-  // POST 요청 옵션 설정
-  let postOptions = {
-    host: 'oauth2.googleapis.com',
-    port: '443',
-    path: '/revoke',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Content-Length': Buffer.byteLength(postData),
-    },
-  };
-
-  // 요청 객체 설정
-  const postReq = https.request(postOptions, function (res) {
-    res.setEncoding('utf8');
-    res.on('data', (d) => {
-      console.log('Response: ' + d);
-    });
-  });
-
-  postReq.on('error', (error) => {
-    console.log(error);
-  });
-
-  // 데이터와 함께 요청 전송
-  postReq.write(postData);
-  postReq.end();
 }
 
 async function authLogout(req, res, next) {
@@ -208,9 +176,7 @@ async function registerAfterOAuth(req, res) {
   try {
     const s = req.session.ouathUser;
     if (!s) {
-      return res
-        .status(400)
-        .json({ message: '세션이 만료되었습니다. 다시 로그인하세요' });
+      throw new BadRequestError('잘못된 요청입니다. 입력값을 확인하세요.');
     }
     const { user_id, name, phone, is_student } = req.body;
 
@@ -226,15 +192,15 @@ async function registerAfterOAuth(req, res) {
 
     res.redirect('/'); // spa frontend route
   } catch (err) {
-    console.error('등록 에러', err);
-    throw new Error('ouath 인증 후 등록 실패');
+    throw new InternalServerError(
+      '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+    );
   }
 }
 
 export default {
   googleAuthRedirect,
   authCallback,
-  authRevoke,
   authLogout,
   registerAfterOAuth,
 };

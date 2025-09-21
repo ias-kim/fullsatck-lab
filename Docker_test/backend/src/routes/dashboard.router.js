@@ -1,9 +1,9 @@
 import express from 'express';
-import { authJWT, hasRole } from '../middlewares/authJWT.js';
+import { authWithRole } from '../middlewares/authJWT.js';
 
 const router = express.Router();
 
-router.get('/', authJWT, hasRole('student'), (req, res) => {
+router.get('/', authWithRole('student'), (req, res) => {
   console.log(
     'decoded user from token:',
     req.user.user_id,
@@ -15,9 +15,7 @@ router.get('/', authJWT, hasRole('student'), (req, res) => {
     user: {
       user_id: req.user.user_id,
       name: req.user.name,
-      email: req.user.email,
       role: req.user.role,
-      status: req.user.status,
     },
   });
 });

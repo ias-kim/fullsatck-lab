@@ -12,13 +12,4 @@ const pool = mysql.createPool({
   charset: 'utf8mb4',
 });
 
-// pool.getConnection(function (err) {
-//   if (err) {
-//     console.error('Error connecting', err.stack);
-//     return;
-//   }
-//
-//   console.log('connected as id ' + pool.threadId);
-// });
-
 export default pool;
