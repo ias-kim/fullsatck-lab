@@ -58,7 +58,7 @@ services:
     container_name: dev_db
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: gsc
+      MYSQL_DATABASE: gsc_portal
       TZ: ${TIME_ZONE}
     ports:
       - "3306:3306"

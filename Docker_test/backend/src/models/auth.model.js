@@ -1,70 +1,118 @@
-const pool = require('../config/db.js');
-const jwt = require('jsonwebtoken');
-const redisClient = require('../config/redis.js');
+import pool from '../config/db.js';
 
-const login = async (req, res) => {
-  // user 로직
+// 이메일 관련 사용자 찾기
+export const findByEmail = async (email) => {
+  const [rows] = await pool.query(
+    'SELECT * FROM user_account WHERE email = ?',
+    [email],
+  );
+  return rows[0];
+};
 
-  if (success) {
-    // access token과 refresh token을 발급
-    const accessToken = jwt.sign(user);
-    const refreshToken = jwt.refresh();
+// 이메일 허용 사용자 찾기
+export const findAuthEmail = async (email) => {
+  const [rows] = await pool.query(
+    'SELECT * FROM allowed_email WHERE email = ?',
+    [email],
+  );
+  return rows[0];
+};
 
-    // 발급한 refresh token을 redis에 key를 user의 id로 하여 저장
-    redisClient.set(user.id, refreshToken);
+// 최초 사용자 등록
+export const createStudent = async ({
+  user_id,
+  name,
+  email,
+  phone,
+  status = 'pending',
+  grade_id = null,
+  language_id = null,
+  class_id = null,
+  is_international = null,
+}) => {
+  const conn = await pool.getConnection();
 
-    res.status(200).send({
-      ok: true,
-      data: {
-        accessToken,
-        refreshToken,
-      },
-    });
-  } else {
-    res.status(401).send({
-      ok: false,
-      message: 'password is incorrect',
-    });
+  try {
+    await conn.beginTransaction();
+
+    // 1) user_account 등록
+    const [user] = await conn.query(
+      `INSERT INTO user_account (user_id, name, email, phone, status)
+             VALUES (?, ?, ?, ?, ?)`,
+      [user_id, name, email, phone, status],
+    );
+
+    // 2) student_entity 등록
+    await conn.query(
+      `INSERT INTO student_entity (user_id, grade_id, class_id, language_id, is_international, status)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+      [user_id, grade_id, class_id, language_id, is_international, 'enrolled'],
+    );
+
+    await conn.query(
+      `INSERT INTO user_role (role_type, user_id)
+             VALUES (?, ?)`,
+      ['student', user_id],
+    );
+
+    if (user.affectedRows !== 1) {
+      throw new Error('user_account(학생) 입력 실패 및');
+    }
+
+    await conn.commit();
+    return {
+      user_id,
+      name,
+      email,
+      status,
+      grade_id,
+      class_id,
+      language_id,
+      is_international,
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
   }
 };
 
-const inputUser = (user) => {
-  const { user_id, name, email, status, phone, refresh_token } = user;
-  return new Promise((resolve, reject) => {
-    pool.query(
-      'INSERT INTO user_account (user_id, name, email, status, phone, refresh_token) VALUES (?, ?, ?, ?, ?, ?)',
-      [user_id, name, email, status, phone, refresh_token],
-      (err, result) => {
-        if (err) return reject(err);
-        resolve(result.insertId);
-      },
+// 최초 사용자 교수의 경우
+export const createProfessor = async ({
+  user_id,
+  name,
+  email,
+  phone,
+  status = 'pending',
+}) => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1) 유저 등록
+    const [rows] = await conn.query(
+      `INSERT INTO user_account (user_id, name, email, phone, status)
+             VALUES (?, ?, ?, ?, ?)`,
+      [user_id, name, email, phone, status],
     );
-  });
-};
-
-const updateUser = (user) => {};
-pool.updateUser = async (err, connection) => {
-  if (err) throw err;
-  connection.query(
-    'UPDATE user_account WHERE user_id = ?',
-    function (err, results) {
-      if (err) throw err;
-      console.log('changed' + results.changedRows + ' rows');
-    },
-  );
-};
-
-const deleteUser = (user_id) => {
-  return new Promise((resolve, reject) => {
-    pool.query(
-      'DELETE FROM user_account WHERE user_id = ?',
-      [user_id],
-      (err, result) => {
-        if (err) throw reject(err);
-        resolve(result.affectedRows);
-      },
+    // 2) 권한 교수
+    await conn.query(
+      `INSERT INTO user_role (role_type, user_id)
+             VALUES (?, ?)`,
+      ['professor', user_id],
     );
-  });
-};
 
-module.exports = findByEmail;
+    if (rows.affectedRows !== 1) {
+      throw new Error('user_account 입력 실패');
+    }
+
+    await conn.commit();
+    return { user_id, name, email, phone, status };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+};

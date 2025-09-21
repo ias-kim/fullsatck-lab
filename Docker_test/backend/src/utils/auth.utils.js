@@ -4,21 +4,22 @@ import redisClient from '../config/redis.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
 const secret = process.env.JWT_SECRET;
 
 // ESM 방식 export로 전체 함수 묶어서 내보내기
 export const sign = (user) => {
+  console.log('유저 확인', user);
   const payload = {
     user_id: user.user_id,
     name: user.name,
-    email: user.email,
-    role: user.role,
-    status: user.status,
+    role: user.role || 'student',
   };
 
+  console.log(payload);
   return jwt.sign(payload, secret, {
     algorithm: 'HS256',
-    expiresIn: '30s',
+    expiresIn: '1800s',
   });
 };
 
@@ -26,44 +27,44 @@ export const verify = (token) => {
   try {
     const decoded = jwt.verify(token, secret);
     return {
-      ok: true,
+      success: true,
       user_id: decoded.user_id,
       name: decoded.name,
-      email: decoded.email,
       role: decoded.role,
-      status: decoded.status,
     };
   } catch (err) {
     return {
-      ok: false,
+      success: false,
       message: err.message,
     };
   }
 };
 
-export const refresh = () => {
-  return jwt.sign({}, secret, {
+export const signRefresh = (userId, jti) => {
+  const payload = { sub: String(userId), jti };
+  return jwt.sign(payload, secret, {
     algorithm: 'HS256',
-    expiresIn: '14d',
+    expiresIn: '7d',
   });
 };
 
 export const refreshVerify = async (token, userId) => {
   const getAsync = promisify(redisClient.get).bind(redisClient);
   try {
-    const data = await getAsync(`session:${userId}`);
-    if (data && token === data) {
+    const allTokens = await redisClient.hVals(`session:${userId}`);
+    // const data = await getAsync(`session:${userId}`);
+    if (allTokens && allTokens.includes(token)) {
       try {
         jwt.verify(token, secret);
         return true;
       } catch (err) {
-        console.warn('JWT 검증 실패:', err.message);
+        console.warn('JWT 서명 검증 실패:', err.message);
         return false;
       }
     }
     return false;
   } catch (err) {
-    console.warn('Redis 확인 실패', err.message);
+    console.warn('Redis ㅈ회 실패', err.message);
     return false;
   }
 };

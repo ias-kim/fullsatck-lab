@@ -1,0 +1,26 @@
+<section class="prompt">
+    <h1>Sign in</h1>
+    <form action="/api/auth/register" method="post">
+        <div>
+            <label for="user_id">학번</label>
+            <input id="user_id" name="user_id" type="text" required>
+        </div>
+
+        <div>
+            <label for="name">이름</label>
+            <input id="name" name="name" type="text" required>
+        </div>
+
+        <div>
+            <label for="phone">전화번호</label>
+            <input id="phone" name="phone" type="text" required>
+        </div>
+
+        <div>
+            <label for="is_student">학생입니까?</label>
+            <input type="hidden" name="is_student" value="false">
+            <input type="checkbox" id="is_student" name="is_student" value="true">
+        </div>
+        <button type="submit">Sign in</button>
+    </form>
+</section>

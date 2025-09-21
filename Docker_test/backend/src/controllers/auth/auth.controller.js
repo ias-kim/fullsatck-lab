@@ -3,10 +3,12 @@ import url from 'url';
 import https from 'https';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
-import redisClient from '../config/redis.js';
-import { createUser, findByEmail } from '../models/user.model.js';
-import { refresh, sign } from '../utils/jwt-util.js';
+import redisClient from '../../config/redis.js';
+import { findAuthEmail, findByEmail } from '../../models/auth.model.js';
+import { sign, signRefresh } from '../../utils/auth.utils.js';
 import axios from 'axios';
+import { checkUserStatus, registerUser } from '../../services/user.service.js';
+import { v4 } from 'uuid';
 
 dotenv.config();
 
@@ -44,7 +46,7 @@ async function googleAuthRedirect(req, res) {
     include_granted_scopes: true,
     // CSRF 공격 위험 감소를 위한 state 파라미터 포함
     state,
-    prompt: 'consent',
+    // prompt: 'consent',
   });
   console.log('auth url', authorizationUrl);
 
@@ -72,54 +74,74 @@ async function authCallback(req, res) {
         { headers: { Authorization: `Bearer ${tokens.access_token}` } },
       );
 
+      if (!userInfo.email.endsWith('@g.yju.ac.kr')) {
+        let authUser = await findAuthEmail(userInfo.email);
+
+        if (!authUser) {
+          console.log('유효한 이메일이 아닙니다.');
+          return res.redirect('/');
+        }
+      }
+
       // 1) 사용자 조회/가입
       let user = await findByEmail(userInfo.email);
+
+      // DB 유저가 없을 경우 회원가입 페이지 이동
       if (!user) {
-        // 최초 로그인: INACTIVE로 가입만 시키고 끝
-        await createUser({
-          user_id: undefined, // auto
-          name: undefined,
+        req.session.ouathUser = {
           email: userInfo.email,
-          status: 'INACTIVE',
-        });
-        console.log('이제 회원가입 완료');
-        return res.redirect('/signup/pending'); // "승인 대기" 페이지
+        };
+        // 최초 로그인시 회원가입 페이지로 이동
+        return res.redirect('/api/auth/register'); // 회원가입 페이지
       }
-      // 잠시 오픈 마인드 주석
-      // if (user.status !== 'ACTIVE') {
-      //   // 가입은 되어있으나 아직 승인 안됨
-      //   console.log('승인대기');
-      //   return res.redirect('/signup/pending');
-      // }
+      const verdict = checkUserStatus(user.status);
 
-      const payload = {
-        user_id: user.user_id,
-        name: user.name,
-        email: user.email,
-        role: user.role ?? 'STUDENT',
-        status: user.status,
-      };
-      // 사용자 정보와 Google refresh Token을 db에 저장/업데이트
-      // 사용자 DB 처리: 없으면 insert, 있으면 조회
+      // 비승인 접근 거절
+      if (!verdict.success) {
+        if (verdict.redirect) return res.redirect(verdict.redirect);
+        return res
+          .status(verdict.http)
+          .json({ success: false, message: verdict.message });
+      }
 
-      console.log('값 이메일', payload.email);
+      if (user) {
+        const payload = {
+          user_id: user.user_id,
+          name: user.name,
+          role: user.role ?? 'student',
+        };
+        const jti = v4();
+        //  JWT 생성
+        const accessToken = sign(payload); // 앱의 Access Token
+        const refreshToken = signRefresh(payload.user_id, jti); // 앱의 Refresh Token
 
-      // const result = await createUser(userPayload);
-      const userId = payload.user_id;
-      console.log(userId);
-      //  JWT 생성
-      const accessToken = sign(payload); // 앱의 Access Token
-      const refreshToken = refresh(payload); // 앱의 Refresh Token
+        // 학번 추출
+        const userId = payload.user_id;
+        // 1. 요청 헤더에서 기기 정보 가져오기
+        const deviceId = req.headers['user-agent'] || 'unknown_device';
 
-      // Refresh Token을 Redis에 저장
-      await redisClient.set(`session:${userId}`, refreshToken, {
-        EX: 14 * 24 * 60 * 60, // 14일 유효기간 설정
-      });
+        // 2. Redis Hash에 리프레시 토큰 저장
+        const sessionKey = `session:${userId}`;
+        const sevenDaysInSeconds = 7 * 24 * 60 * 60;
+        await redisClient.hSet(sessionKey, deviceId, refreshToken);
+        await redisClient.expire(sessionKey, sevenDaysInSeconds);
 
-      // 쿠키
-      res.cookie('accessToken', accessToken, { httpOnly: true });
-      res.cookie('refreshToken', refreshToken, { httpOnly: true });
-      res.redirect('/dashboard'); // spa frontend route
+        // await redisClient.set(`session:${userId}`, refreshToken, {
+        //   EX: 7 * 24 * 60 * 60 * 1000, // 7일
+        // });
+
+        // 쿠키에 토큰 설정 응답
+        res.cookie('accessToken', accessToken, {
+          httpOnly: true,
+          maxAge: 1000 * 60 * 60,
+        });
+        res.cookie('refreshToken', refreshToken, {
+          httpOnly: true,
+          maxAge: 7 * 24 * 60 * 60,
+        });
+        res.redirect('/api/dashboard'); // spa frontend route
+      }
+
       if (
         tokens.scope.includes(
           'https://www.googleapis.com/auth/calendar.readonly',
@@ -182,9 +204,37 @@ async function authLogout(req, res, next) {
   }
 }
 
+async function registerAfterOAuth(req, res) {
+  try {
+    const s = req.session.ouathUser;
+    if (!s) {
+      return res
+        .status(400)
+        .json({ message: '세션이 만료되었습니다. 다시 로그인하세요' });
+    }
+    const { user_id, name, phone, is_student } = req.body;
+
+    const userPayload = {
+      user_id,
+      name,
+      phone,
+      is_student,
+      email: s.email,
+    };
+
+    await registerUser(userPayload);
+
+    res.redirect('/'); // spa frontend route
+  } catch (err) {
+    console.error('등록 에러', err);
+    throw new Error('ouath 인증 후 등록 실패');
+  }
+}
+
 export default {
   googleAuthRedirect,
   authCallback,
   authRevoke,
   authLogout,
+  registerAfterOAuth,
 };

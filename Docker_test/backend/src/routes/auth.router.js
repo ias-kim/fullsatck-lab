@@ -1,42 +1,26 @@
 import express from 'express';
-import dotenv from 'dotenv';
-import authController from '../controllers/auth.controller.js';
-import refreshController from '../controllers/refresh.controller.js';
-import authJwt from '../middlewares/authJWT.js';
+import authController from '../controllers/auth/auth.controller.js';
+import refreshController from '../controllers/auth/refresh.controller.js';
 
-dotenv.config();
-
-export const authRouter = express.Router();
+const router = express.Router();
 
 // 사용자를 Google OAuth 2.0 서버로 리디렉션하는 예시입니다.
-authRouter.get('/', authController.googleAuthRedirect);
+router.get('/', authController.googleAuthRedirect);
 
 // Google OAuth 2.0 서버에서 콜백을 수신합니다.
-authRouter.get('/callback', authController.authCallback);
+router.get('/callback', authController.authCallback);
 
 // 토큰을 철회하는 예시
-authRouter.get('/revoke', authController.authRevoke);
+router.get('/revoke', authController.authRevoke);
 
-authRouter.get('/logout', authController.authLogout);
-
-authRouter.post('/dashboard', authJwt, (req, res) => {
-  console.log(
-    'decoded user from token:',
-    req.user.user_id,
-    req.user.name,
-    req.user.email,
-  );
-  return res.status(200).json({
-    message: 'Success',
-    user: {
-      user_id: req.user.user_id,
-      name: req.user.name,
-      email: req.user.email,
-      role: req.user.role,
-      status: req.user.status,
-    },
-  });
+router.get('/register', (req, res) => {
+  res.render('register');
 });
-authRouter.post('/refresh', refreshController.refresh);
 
-export default authRouter;
+router.post('/register', authController.registerAfterOAuth);
+
+router.post('/logout', authController.authLogout);
+
+router.post('/refresh', refreshController.isVeryRefresh);
+
+export default router;
