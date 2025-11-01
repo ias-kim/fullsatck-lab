@@ -19,7 +19,7 @@ function VisibillityFilter({ visibilityFilter, setVisiblityFilter }: Props) {
   return (
     <>
       <div>
-        <div>{visiblityFilter}</div>
+        <div>{visibilityFilter}</div>
         <Button onClick={() => 전체보기()}>전체보기</Button>
         <Button onClick={() => 해야할일보기()}>해야할 일 보기</Button>
         <Button onClick={() => 완료한일보기()}>완료한 일 보기</Button>

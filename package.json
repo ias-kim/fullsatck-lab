@@ -15,8 +15,12 @@
     "vite": "^5.1.6"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.9.2",
     "bootstrap": "^5.3.6",
+    "classnames": "^2.5.1",
     "express": "^5.1.0",
+    "react-redux": "^9.2.0",
+    "redux": "^5.0.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },

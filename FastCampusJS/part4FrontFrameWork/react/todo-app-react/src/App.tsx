@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './App.css';
 import Footer from './components/Footer';
-import { Todo } from './type/Todo.ts';
+import type { Todo } from './type/Todo.ts';
 import VisibillityFilter from './components/VisibillityFilter.tsx';
 import TodoList from './components/TodoList.tsx';
 import TodoInput from './components/TodoInput.tsx';

@@ -1,5 +1,5 @@
 import React, { Dispatch, SetStateAction } from 'react';
-import { Todo } from '../type/Todo.ts';
+import type { Todo } from '../type/Todo.ts';
 
 interface Props {
   todos: Todo[];
@@ -28,7 +28,7 @@ function TodoInput({ todos, setTodos }: Props) {
       <input
         type="text"
         placeholder="할일을 입력해주십쇼."
-        onKeydown={(event) => 할일추가(event)}
+        onKeyDown={(event) => 할일추가(event)}
       />
     </>
   );

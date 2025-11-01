@@ -1,4 +1,4 @@
-import { Todo } from '../type/Todo.ts';
+import type { Todo } from '../type/Todo.ts';
 
 interface Props {
   todos: Todo[];

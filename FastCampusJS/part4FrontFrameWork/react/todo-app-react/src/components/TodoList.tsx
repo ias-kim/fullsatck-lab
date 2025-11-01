@@ -1,6 +1,6 @@
 import TodoItems from './TodoItems.tsx';
 import React, { Dispatch, SetStateAction, useMemo, useState } from 'react';
-import { Todo } from '../type/Todo.ts';
+import type { Todo } from '../type/Todo.ts';
 
 interface Props {
   visiblityFilter: string;
@@ -9,7 +9,7 @@ interface Props {
 }
 
 function TodoList({ visiblityFilter, todos, setTodos }: Props) {
-  const [editingTodo, setEditingTodo] = useState<Todo | null>;
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const filteredTodos = useMemo(() => {
     switch (visiblityFilter) {
       case 'ALL':
@@ -18,8 +18,9 @@ function TodoList({ visiblityFilter, todos, setTodos }: Props) {
         return todos.filter((todo) => !todo.completed);
       case 'COMPLETED':
         return todos.filter((todo) => todo.completed);
+      default:
+        return todos;
     }
-    return todos;
   }, [visiblityFilter, todos]);
 
   return (
