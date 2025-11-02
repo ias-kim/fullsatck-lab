@@ -7,7 +7,7 @@
 services:
   backend:
     build: ./backend
-    container_name: dev_backend
+    container_name: dev_backend_test
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -30,7 +30,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: dev_frontend
+    container_name: dev_frontend_test
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -55,7 +55,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    container_name: dev_db
+    container_name: dev_db_test
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: gsc_portal

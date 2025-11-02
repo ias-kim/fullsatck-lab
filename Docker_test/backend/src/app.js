@@ -32,13 +32,13 @@ app.set('view engine', 'ejs');
 app.engine('ejs', ejs.__express);
 
 // authRoute
-app.use('/api/auth', authRouter);
-app.use('/api/notice', noticeRouter);
-app.use('/api/dashboard', dashboardRouter);
+app.use('/auth', authRouter);
+app.use('/notice', noticeRouter);
+app.use('/dashboard', dashboardRouter);
 
 // default route
 app.get('/', (req, res) => {
-  res.send(`<a href='/api/auth'>구글 로그인</a>`);
+  res.send(`<a href='/auth'>구글 로그인</a>`);
 });
 
 if (import.meta.url === `file://${process.argv[1]}`) {
