@@ -18,13 +18,13 @@ const solution = (s) => {
   // 반복문을 통한 문자열 검증
   for (const char of s) {
     if (char === '(' || char === '{' || char === '[') {
-      stack.push(s);
-
+      stack.push(char);
+    } else {
       // 닫는 스택인데 비어있으면 잘못되었음
       if (stack.length === 0) return false;
 
       // 닫는 스택이 잘못되면 틀림!
-      if (stack.pop !== pairs[char]) return false;
+      if (stack.pop() !== pairs[char]) return false;
     }
 
     return stack.length === 0;
