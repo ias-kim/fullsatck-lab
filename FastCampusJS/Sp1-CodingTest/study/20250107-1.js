@@ -5,25 +5,28 @@ let input = fs.readFileSync('/dev/stdin').toString().split('\n');
 // 괄호로 구성된 s의 형태가 올바른지 여부를 solution 함수의 반환 값으로 bool 형식으로 반환하는 프로그램 작성.
 
 const solution = (s) => {
+  // 검증에 필요한 배열
   const stack = [];
+
+  // 여는괄호 닫는괄호 쌍으로 존재
   const pairs = {
     ')': '(',
-    ']': '[',
     '}': '{',
+    ']': '[',
   };
 
-  for (const ch of s) {
-    // 여는 괄호 push
-    if (ch === '(' || ch === '[' || ch === '{') {
+  // 반복문을 통한 문자열 검증
+  for (const char of s) {
+    if (char === '(' || char === '{' || char === '[') {
       stack.push(s);
-    } else {
-      // 닫는 괄호인데 stack이 비어있으면 잘못되었음.
-      if (stack.length === 0) return false;
-      // 스택이 top이 짝이 아니면 잘못됨
-      if (stack.pop() !== pairs[ch]) return false;
-    }
-  }
 
-  // 모든 괄호가 정상적으로 닫혔는지 확인.
-  return stack.length === 0;
+      // 닫는 스택인데 비어있으면 잘못되었음
+      if (stack.length === 0) return false;
+
+      // 닫는 스택이 잘못되면 틀림!
+      if (stack.pop !== pairs[char]) return false;
+    }
+
+    return stack.length === 0;
+  }
 };
